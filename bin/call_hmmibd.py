@@ -1,0 +1,74 @@
+#! /usr/bin/env python3
+import allel
+from subprocess import run
+from pathlib import Path
+import pandas as pd
+import argparse
+
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--vcf", type=str, required=True)
+    parser.add_argument("--bp_per_cm", type=int, required=True)
+    parser.add_argument("--n", type=int, default=100)
+    parser.add_argument("--m", type=int, default=5)
+    parser.add_argument("--seqlen_in_cm", type=int, required=True)
+    parser.add_argument("--chrno", type=int, required=True)
+    parser.add_argument("--mincm", type=float, default=2.0)
+
+    return parser.parse_args()
+
+
+args = get_args()
+vcf = args.vcf
+bp_per_cm = args.bp_per_cm
+seqlen_in_cm = args.seqlen_in_cm
+chrno = args.chrno
+n = args.n
+m = args.m
+mincm = args.mincm
+
+# ------------------- make genetic map ----------------------------
+with open(f"{chrno}.map", "w") as f:
+    fields = [f"{chrno}", ".", "0", "1"]
+    f.write("\t".join(fields) + "\n")
+    fields = [f"{chrno}", ".", f"{seqlen_in_cm}", f"{bp_per_cm * seqlen_in_cm}"]
+    f.write("\t".join(fields) + "\n")
+
+# ------------------- prepare hmmibd input ----------------------------
+calldata = allel.read_vcf(vcf, fields=["samples", "CHROM", "POS", "GT"])
+samples = calldata["samples"]
+gt = calldata["calldata/GT"][:, :, 0]
+
+df_pos = pd.DataFrame(
+    {
+        "chrom": calldata["variants/CHROM"],
+        "pos": calldata["variants/POS"],
+    }
+)
+df_gt = pd.DataFrame(gt, columns=samples)
+
+df_hmm_inputs = pd.concat([df_pos, df_gt], axis=1)
+df_hmm_inputs.to_csv("hmm_inputs.txt", sep="\t", index=None)
+
+# ------------------- run hmmibd  ----------------------------
+cmd = f"hmmIBD -i hmm_inputs.txt -o hmmibd_out -n {n} -m {m}"
+run(cmd, shell=True)
+
+
+df_ibd = pd.read_csv("hmmibd_out.hmm.txt", sep="\t")[lambda x: (x["different"] == 0)]
+df_ibd.columns = ["Id1", "Id2", "Chr", "Start", "End", "Diff", "Nsnp"]
+# update tsk sample name to nunber only names
+df_ibd["Id1"] = df_ibd["Id1"].str.replace("tsk_", "", regex=False)
+df_ibd["Id2"] = df_ibd["Id2"].str.replace("tsk_", "", regex=False)
+# add fake columns
+df_ibd["Ancestor"] = 99999
+df_ibd["Tmrca"] = 100
+df_ibd["HasMutation"] = 0
+
+sel_cols = ["Id1", "Id2", "Start", "End", "Ancestor", "Tmrca", "HasMutation"]
+sel_rows = ((df_ibd.End - df_ibd.Start) / bp_per_cm) >= mincm
+df_ibd.loc[sel_rows, sel_cols].to_csv(f"{chrno}.ibd", sep="\t", index=None)
+
+# -------------------- write log (just for consistency with other ibd callers) -
+Path(f"{chrno}.log").write_text(cmd)
