@@ -1,26 +1,11 @@
 #! /usr/bin/env python3
 import argparse
 from pathlib import Path
-import sys
-import tskit
-import tsinfer
-import tsdate
-import msprime
 import pandas as pd
-import numpy as np
-import allel
-import gzip
-from typing import Tuple, List
-import io
-import msprime
-import sys
 import subprocess
 
 # --------------------- get hapibd jar path------------------------
-if "__file__" in locals():
-    hapibd_jar = str((Path(__file__).parents[1] / "lib/hap-ibd.jar").absolute())
-else:
-    hapibd_jar = "/autofs/projects-t3/toconnor_grp/bing.guo/temp_work/20220316_tsinfer_ibd_vs_hapibd/trueibd/nf_scripts/lib/hap-ibd.jar"
+hapibd_jar = str((Path(__file__).parents[1] / "lib/hap-ibd.jar").absolute())
 
 # --------------------- parse arguments -----------------------------
 parser = argparse.ArgumentParser(
@@ -48,11 +33,7 @@ parser.add_argument("--minmarkers", type=int, default=100)
 parser.add_argument("--mem_gb", type=int, required=True)
 parser.add_argument("--nthreads", type=int, default=None)
 
-if sys.argv[0] == "":  # interactive mode, used for testing
-    args_lst = "--vcf 1.vcf.gz --bp_per_cm 15000 --seqlen_in_cm 100 --chrno 1 --mem_gb 10 --nthreads 10".split()
-    args = parser.parse_args(args_lst)
-else:
-    args = parser.parse_args()
+args = parser.parse_args()
 
 vcf = args.vcf
 bp_per_cm = args.bp_per_cm
