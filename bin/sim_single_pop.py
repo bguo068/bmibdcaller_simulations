@@ -11,10 +11,7 @@ import pyslim
 import io
 import warnings
 import argparse
-from pathlib import Path
-import sys
 import gzip
-import json
 from ibdutils.utils.others import CheckableParams
 
 slim_script_dir = Path(__file__).parents[1] / "slim"
@@ -230,8 +227,11 @@ def write_peudo_homozygous_vcf(ts_mutated, chrno, out_vcf):
         if len(v.alleles) != 2:
             continue
         gt_list.append(v.genotypes)
-        ref_list.append(v.alleles[0])
-        alt_list.append(v.alleles[1])
+        i = int(v.alleles[1])
+        a = "ATGC"[i % 4]
+        r = "ATGC"[(i + 1) % 4]
+        ref_list.append(r)
+        alt_list.append(a)
         pos_list.append(int(v.position))
 
     # prep header
@@ -260,6 +260,7 @@ def write_peudo_homozygous_vcf(ts_mutated, chrno, out_vcf):
 
     # gt info
     df2 = pd.DataFrame(gt_list)
+    # sample names are in the format of "tsk_{n}"
     df2.columns = [f"tsk_{n}" for n in df2.columns]
     df2 = df2.astype(str)
     df2 = df2 + "|" + df2

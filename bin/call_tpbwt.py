@@ -1,15 +1,11 @@
 #! /usr/bin/env python3
 
 import phasedibd
-import pathlib
 import pandas as pd
 import numpy as np
 import allel
 import argparse
 from pathlib import Path
-import sys
-import pandas as pd
-from typing import Tuple, List
 import sys
 import subprocess
 
@@ -27,8 +23,8 @@ The output will be ${chrno}.ibd, ${chrno}.map and ${chrno}.log file
 """
 )
 parser.add_argument("--vcf", type=str, required=True, help="input vcf file")
-parser.add_argument("--bp_per_cm", type=int, required=True)
-parser.add_argument("--seqlen_in_cm", type=int, required=True)
+parser.add_argument("--r", type=float, required=True)
+parser.add_argument("--seqlen", type=int, required=True)
 parser.add_argument("--chrno", type=int, required=True)
 parser.add_argument(
     "--template", type=int, required=True, help="default 0, template (error 1 in 4): 1 "
@@ -39,35 +35,13 @@ parser.add_argument(
 parser.add_argument("--Lf", type=float, default=3.0, help="min IBD length in cM")
 parser.add_argument("--mem_gb", type=int, required=True)  # not used
 parser.add_argument("--nthreads", type=int, default=None)
+parser.add_argument("--genome_set_id", type=int, required=True)
 
-if sys.argv[0] == "":  # interactive mode, used for testing
-    args_lst = [
-        "--vcf",
-        "/local/projects-t3/toconnor_grp/bing.guo/temp_work/20220316_tsinfer_ibd_vs_hapibd/runs/run_0407/results/N0_10000_Neutral/s1_simulations/1/1.vcf.gz",
-        "--template",
-        "0",
-        "--bp_per_cm",
-        "15000",
-        "--seqlen_in_cm",
-        "100",
-        "--chrno",
-        "1",
-        "--Lm",
-        "300",
-        "--Lf",
-        "3.0",
-        "--mem_gb",
-        "10",
-        "--nthreads",
-        "10",
-    ]
-    args = parser.parse_args(args_lst)
-else:
-    args = parser.parse_args()
+args = parser.parse_args()
 
 vcf = args.vcf
-bp_per_cm = args.bp_per_cm
-seqlen_in_cm = args.seqlen_in_cm
+bp_per_cm = int(0.01/args.r)
+seqlen_in_cm = args.seqlen / bp_per_cm
 chrno = args.chrno
 mem_gb = args.mem_gb
 nthreads = args.nthreads
@@ -77,6 +51,7 @@ Lf = args.Lf
 
 # decompress vcf file if needed
 if Path(vcf).suffix == ".gz":
+    # use '-dc' option to avoid deleting original gz file
     subprocess.run(f"gzip -dc {vcf} > {chrno}.vcf", shell=True)
     vcf = f"{chrno}.vcf"
 
@@ -134,8 +109,10 @@ ibd_df = pd.DataFrame(
 )
 
 # write to file
-out_ibd_fn = f"{chrno}.ibd"
-ibd_df.to_csv(out_ibd_fn, sep="\t", header=True, index=None)
+ofn = f"{args.genome_set_id}_{chrno}_tpbwtibd.ibd"
+ibd_df.to_csv(ofn, sep="\t", header=True, index=None)
 
-# write log file
-Path(f"{chrno}.log").write_text(f"ibd no.: {ibd_df.shape[0]}\n")
+print(f"""
+    output: 
+        {ofn}
+     """)

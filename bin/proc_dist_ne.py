@@ -6,36 +6,41 @@ from pathlib import Path
 import ibdutils.runner.ibdne as ibdne
 import ibdutils.utils.ibdutils as ibdutils
 
-ibd_jar_default = str(Path(__file__).parent / "ibdne.jar")
+ibd_jar_default = str(Path(__file__).parents[1] / "lib/ibdne.23Apr20.ae9.jar")
 
 # parse arguments
 pa = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
-pa.add_argument("--ibd_files", type=str, nargs=14, required=True)
-pa.add_argument("--label", type=str, required=True)
+pa.add_argument("--ibd_files", type=str, nargs="+", required=True)
+pa.add_argument("--genome_set_id", type=int, required=True)
 pa.add_argument("--ibdne_jar", type=str, default=ibd_jar_default)
 pa.add_argument("--ibdne_mincm", type=float, default=4)
 pa.add_argument("--ibdne_minregion", type=float, default=10)
+pa.add_argument("--r", type=float, default=0.01 / 15000)
+pa.add_argument("--seqlen", type=int, default=100 * 15000)
+pa.add_argument("--nchroms", type=int, default=14)
+
 args = pa.parse_args()
 
 assert args.ibdne_jar is not None
 
-label = args.label
+genome_set_id = args.genome_set_id
 ibdne_mincm = args.ibdne_mincm
 ibdne_minregion = args.ibdne_minregion
 
 # create genome obj
-genome_Pf3D7_numeric = ibdutils.Genome.get_genome("Pf3D7")
+genome = ibdutils.Genome.get_genome_simple_simu(args.r, args.nchroms, args.seqlen)
 
 # create ibd obj
-ibd = ibdutils.IBD(genome=genome_Pf3D7_numeric, label=f"{label}_orig")
+ibd = ibdutils.IBD(genome=genome, label=f"{genome_set_id}_orig")
 
 # read ibd from files each containing IBD segment info for a chromosome
 # and remove sample name suffix (such as "~0.9-0.2") that was used
 # for carrying haploid genome ratios
-ibd.read_ibd(ibd_fn_lst=args.ibd_files, rm_sample_name_suffix=True)
+# ibd.read_ibd(ibd_fn_lst=args.ibd_files, rm_sample_name_suffix=True)
+ibd.read_ibd(ibd_fn_lst=args.ibd_files)
 
 # ---- save origin IBD obj for distribution analyses
-of_ibddist_ibdobj = f"{label}_ibddist.ibdobj.gz"
+of_ibddist_ibdobj = f"{genome_set_id}_ibddist.ibdobj.gz"
 ibd.pickle_dump(of_ibddist_ibdobj)
 
 
@@ -44,7 +49,7 @@ ibd_all = ibd.duplicate()
 ibd_all.filter_ibd_by_length(min_seg_cm=ibdne_mincm)
 ibd_all.calc_ibd_cov()
 ibd_all.find_peaks()
-ibd_all.pickle_dump(f"{label}_orig_all.ibdcov.ibdobj.gz")
+ibd_all.pickle_dump(f"{genome_set_id}_orig_all.ibdcov.ibdobj.gz")
 
 # remove highly related samples
 mat = ibd.make_ibd_matrix()
@@ -56,7 +61,7 @@ ibd_unrel = ibd.duplicate()
 ibd_unrel.filter_ibd_by_length(min_seg_cm=ibdne_mincm)
 ibd_unrel.calc_ibd_cov()
 ibd_unrel.find_peaks()
-ibd_unrel.pickle_dump(f"{label}_orig_unrel.ibdcov.ibdobj.gz")
+ibd_unrel.pickle_dump(f"{genome_set_id}_orig_unrel.ibdcov.ibdobj.gz")
 
 # remove short segments
 ibd.filter_ibd_by_length(min_seg_cm=ibdne_mincm)
@@ -98,11 +103,11 @@ nerunner = ibdne.IbdNeRunner(
 nerunner.run(nthreads=6, mem_gb=20, dry_run=True)
 
 # save of OBJ copy
-ibd.pickle_dump(f"{label}_orig.ibdne.ibdobj.gz")
+ibd.pickle_dump(f"{genome_set_id}_orig.ibdne.ibdobj.gz")
 
 # remove peaks
 
-ibd2 = ibd.duplicate(f"{label}_rmpeaks")
+ibd2 = ibd.duplicate(f"{genome_set_id}_rmpeaks")
 ibd2.remove_peaks()
 
 
@@ -118,24 +123,24 @@ nerunner = ibdne.IbdNeRunner(
 nerunner.run(nthreads=6, mem_gb=20, dry_run=True)
 
 # save of OBJ copy
-ibd.pickle_dump(f"{label}_rmpeaks.ibdne.ibdobj.gz")
+ibd.pickle_dump(f"{genome_set_id}_rmpeaks.ibdne.ibdobj.gz")
 
 
 print(
     f"""
       output files:
         ibdne.jar
-        {label}_orig.sh
-        {label}_orig.map
-        {label}_orig.ibd.gz
-        {label}_orig.cov.pq
-        {label}_rmpeaks.sh
-        {label}_rmpeaks.map
-        {label}_rmpeaks.ibd.gz
-        {label}_ibddist.ibdobj.gz
-        {label}_orig_all.ibdcov.ibdobj.gz
-        {label}_orig_unrel.ibdcov.ibdobj.gz
-        {label}_orig.ibdne.ibdobj.gz
-        {label}_rmpeaks.ibdne.ibdobj.gz
+        {genome_set_id}_orig.sh
+        {genome_set_id}_orig.map
+        {genome_set_id}_orig.ibd.gz
+        {genome_set_id}_orig.cov.pq
+        {genome_set_id}_rmpeaks.sh
+        {genome_set_id}_rmpeaks.map
+        {genome_set_id}_rmpeaks.ibd.gz
+        {genome_set_id}_ibddist.ibdobj.gz
+        {genome_set_id}_orig_all.ibdcov.ibdobj.gz
+        {genome_set_id}_orig_unrel.ibdcov.ibdobj.gz
+        {genome_set_id}_orig.ibdne.ibdobj.gz
+        {genome_set_id}_rmpeaks.ibdne.ibdobj.gz
     """
 )

@@ -1,35 +1,9 @@
 nextflow.enable.dsl=2
 
-params.outdir = "results"
-params.test = false
-params.sim_related = 0
-params.simulation_defaults= [
-    num_chr : params.test ? 2: 14,
-    label : "label",
-    chrno : 1,
-    s : 0.2,
-    h : 0.5,
-    selpos_0_1 : 0.33,
-    num_origins : 1,
-    s_start_g : 50,
-    u : 1e-8,  // set to nozero value, used in simulate_chr_mutation
-    bp_per_cm : 15000, // set to pf values
-    seqlen_in_cm : 100,
-    ne_change_start_g : 200,
-    N : 10000,
-    N0 : 10000,
-    nsam : params.test ? 100 : 1000,
-    sim_related: params.sim_related,
-    test : params.test,
-    minregion: params.test ? 10 : 50,
-    ibd_cut_mode: "nocut",
-    proc_label: "nocut",
-    cut_start: 0,
-    cut_end: 0
-]
 params.maf = params.test ? 0.00001: 0.01
 params.mincm = 2.0
 params.num_neutral_chrs = 0
+params.nchroms = 14
 
 params.tpbwt_template_opts = 1
 params.tpbwt_Lm = params.test ? 152: 300
@@ -44,8 +18,6 @@ params.hapibd_minmarkers = 100
 params.refinedibd_length = params.mincm
 params.refinedibd_lod = 3.0
 params.refinedibd_scale = 0
-params.tsktrueibd_mincm= params.mincm
-params.ibdne_mincm = params.mincm
 
 params.hmmibd_n = 100
 params.hmmibd_m = 5
@@ -54,337 +26,587 @@ params.isorelate_imiss = 0.3
 params.isorelate_vmiss = 0.3
 params.isorelate_min_snp = 100
 
-process SIMULATE_CHR {
-    tag "simu_${d.label}_${d.chrno}"
-    publishDir "$params.outdir/${d.label}/s1_simulations/${d.chrno}", mode: 'copy'
-    input:
-    val (d)
-    output: 
-    tuple val(d), path("${d.chrno}.trees"), emit: trees
-    tuple val(d), path("tmp_slim_out*.trees"), path("*.daf"), path("*.true_ne"), path("*.restart_count"), emit: others
+params.tsinferibd_max_tmrca = [1000, 3000]
 
-    script:
-    """
-    # Note here ignore mu and use 0 for simulating ancestry
-    sim_anc.py \
-        --chrno=${d.chrno} \
-        --s=${d.s} \
-        --h=${d.h} \
-        --selpos_0_1=${d.selpos_0_1} \
-        --num_origins=${d.num_origins} \
-        --s_start_g=${d.s_start_g} \
-        --u=0 \
-        --bp_per_cm=${d.bp_per_cm} \
-        --seqlen_in_cm=${d.seqlen_in_cm} \
-        --ne_change_start_g=${d.ne_change_start_g} \
-        --N=${d.N} \
-        --N0=${d.N0} \
-        --nsam=${d.nsam} \
-        --sim_related=${d.sim_related}
-    """
-    stub:
-    """touch  tmp_slim_out_${d.chrno}.trees ${d.chrno}.daf ${d.chrno}.restart_count ${d.chrno}.trees ${d.chrno}.true_ne"""
+params.ibdne_mincm = params.mincm
+params.ibdne_minregion = 10
+
+
+params.ifm_transform = ["square", "cube", "none"][0]
+params.ifm_ntrails = 1000
+params.ifm_mincm = 2.0
+params.ifm_mingwcm = 5.0
+
+params.test = false
+params.resdir = "res"
+
+params.meta = "" // empty for simulation
+
+def resdir = params.resdir
+
+def sp_defaults = [
+    seqlen : 100 * 15000,
+    selpos : Math.round(0.33 * 100 * 15000),
+    num_origins : 1,
+    N : params.test? 500: 10000,
+    h : 0.5,
+    s : 0.3,
+    g_sel_start : 80,
+    r : 0.01 / 15_000,
+    sim_relatedness : 0,
+    g_ne_change_start : 200,
+    N0 : params.test? 500:1000,
+    u : 1e-8,
+    nsam : params.test?100: 1000, // haploid
+]
+
+def mp_defaults = [
+    seqlen : 100 * 15000,
+    selpos : Math.round(100 * 15000 * 0.33),
+    num_origins : 1,
+    N : params.test? 500: 10000,
+    h : 0.5,
+    s : 0.3,
+    g_sel_start : 80,
+    r : 0.01 / 15_000,
+    sim_relatedness : 0,
+    mig : 1e-5,
+    sel_mig : 0.01,
+    npop : 5,
+    nsam : params.test? 40: 200, // haploid
+    Tsplit : 500,
+    u : 1e-8,
+]
+
+def mp_ne(args) {
+    def ne = args.N * args.npop + (args.npop-1) * (args.npop-1) / 4 / args.npop / args.sel_mig
+    return ne
 }
-        
 
-process SIMULATE_CHR_MUTATIONS {
-    tag "simu_${d.label}_${d.chrno}"
-    publishDir "$params.outdir/${d.label}/s1_simulations/${d.chrno}", mode: 'copy'
-    input: 
-    tuple val(d), path(in_trees_fn)
+def get_maxtmrca(p){
+    def str = p.getName()
+    def match = (str =~ /maxtmrca_(\d+)/)
+    if (match) {
+        def x = match[0][1].toInteger()
+        return x
+    }
+    else{
+        return null
+    }
+}
+
+def sp_sets = [
+    sp_neu: sp_defaults + [s: 0.0, genome_set_id: 10000],
+    sp_s01: sp_defaults + [s: 0.1, genome_set_id: 10001],
+    sp_s02: sp_defaults + [s: 0.2, genome_set_id: 10002],
+    sp_s03: sp_defaults + [s: 0.3, genome_set_id: 10003],
+    sp_g040:sp_defaults + [g_sel_start: 40, genome_set_id: 10004],
+    sp_g080:sp_defaults + [g_sel_start: 80, genome_set_id: 10005],
+    sp_g120:sp_defaults + [g_sel_start:120, genome_set_id: 10006],
+    sp_o01: sp_defaults + [num_origins: 1, genome_set_id: 10007],
+    sp_o03: sp_defaults + [num_origins: 3, genome_set_id: 10008],
+    sp_o27: sp_defaults + [num_origins: 27, genome_set_id: 10009],
+    sp_rel: sp_defaults + [sim_relatedness: 1, genome_set_id: 30000],
+]
+
+def mp_sets = [
+    mp_s00: mp_defaults + [s:0.0, genome_set_id: 20000],
+    mp_s01: mp_defaults + [s:0.1, genome_set_id: 20001],
+    mp_s02: mp_defaults + [s:0.2, genome_set_id: 20002],
+    mp_s03: mp_defaults + [s:0.3, genome_set_id: 20003],
+    mp_rel: mp_defaults + [sim_relatedness: 1, genome_set_id: 30001],
+]
+
+def sp_set_args_keys = sp_sets.collect{k, v -> v}[0].collect{k, v->k}
+def mp_set_args_keys = mp_sets.collect{k, v -> v}[0].collect{k, v->k}
+
+
+process SIM_SP_CHR {
+    tag "${args.genome_set_id}_${chrno}"
+
+    publishDir "${resdir}/${args.genome_set_id}_${label}/trees/", \
+        pattern: "*.trees", mode: "symlink"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/vcf/", \
+        pattern: "*.vcf.gz", mode: "symlink"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/daf/", \
+        pattern: "*.daf", mode: "symlink"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/restart_count/", \
+        pattern: "*.restart_count", mode: "symlink"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/true_ne/", \
+        pattern: "*.true_ne", mode: "symlink"
+
+    input:
+    tuple val(label), val(chrno), val(args)
+
     output:
-    tuple val(d), path("*.vcf.gz")
+    tuple val(label), val(chrno), path("*.trees"), path("*.vcf.gz"), \
+        emit: trees_vcf
+    tuple val(label), val(chrno), path("*.daf"), emit: daf
+    tuple val(label), val(chrno), path("*.restart_count"), \
+        emit: restart_count
+    tuple val(label), val(chrno), path("*.true_ne"), emit: true_ne
+
     script:
+    def cmd_options = (args + [chrno: chrno]).collect{k, v->
+        "--${k} ${v}"}.join(" ")
     """
-    sim_mut.py \
-        --in_chrno ${d.chrno} \
-        --in_trees ${in_trees_fn} \
-        --mu ${d.u} \
-        --out_vcf unfilt.vcf.gz
-    # filter by minor allele frequency
-    bcftools view -q ${params.maf}:minor unfilt.vcf.gz -Oz -o ${d.chrno}.vcf.gz
-    rm unfilt.vcf.gz
+    sim_single_pop.py $cmd_options
+
+    mkdir tmp; mv tmp_* tmp/
     """
     stub:
-    """touch  ${d.chrno}.vcf.gz"""
+    def prefix="${args.genome_set_id}_${chrno}"
+    """
+    touch ${prefix}{.trees,.vcf.gz,.daf,.restart_count,.true_ne}
+    """
 }
 
-process TSINFER_TSDATE_PER_CHR {
-    tag "simu_${d.label}_${d.chrno}"
-    publishDir "$params.outdir/${d.label}/s2_tsinfer_tsdate/${d.chrno}", mode: 'copy'
+process SIM_MP_CHR {
+    tag "${args.genome_set_id}_${chrno}"
+
+    publishDir "${resdir}/${args.genome_set_id}_${label}/trees/", \
+        pattern: "*.trees", mode: "symlink"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/vcf/",\
+        pattern: "*.vcf.gz", mode: "symlink"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/restart_count/",\
+        pattern: "*.restart_count", mode: "symlink"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/daf/",\
+        pattern: "*.daf", mode: "symlink"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/demog/",\
+        pattern: "*_demog.png", mode: "symlink"
+
     input:
-    tuple val(d), path(vcf_files), path(true_ne_df)
+    tuple val(label), val(chrno), val(args)
+
     output:
-    tuple val(d), path("${d.chrno}.trees")
-    script: 
-    """
-    tsinfer_tsdate_gw.py \
-        --vcf_files ${vcf_files} \
-        --in_bp_per_cm ${d.bp_per_cm} \
-        --ne ${true_ne_df} # --out_trees ${d.chrno}.trees
-    """
-    stub:
-    """touch  ${d.chrno}.trees"""
-}
-
-process CALC_RAW_IBD {
-    tag "simu_${d.label}_${d.src}_${d.chrno}"
-    publishDir "$params.outdir/${d.label}/s3_calc_raw_ibd/${d.src}/${d.chrno}", mode: 'copy'
-    input:
-    tuple val (d), path("${d.chrno}.trees")
-    output: 
-    tuple val(d), path("${d.chrno}.ibd"), emit: raw_ibd
-    tuple val(d), path("${d.chrno}.map"), emit: gmap
-    tuple val(d), path("${d.chrno}.log"), emit: log
+    tuple val(label), val(chrno), path("*.trees"), path("*.vcf.gz"), \
+        emit: trees_vcf
+    tuple val(label), val(chrno), path("*.daf"), emit: daf
+    tuple val(label), val(chrno), path("*.restart_count"), emit: restart_count
+    tuple val(label), val(chrno), path("*_demog.png"), emit: demog
 
     script:
+    def cmd_options = (args + [chrno: chrno]).collect{k, v->
+        "--${k} ${v}"}.join(" ")
     """
-    calc_raw_ibd.py --chrno ${d.chrno} --bp_per_cm ${d.bp_per_cm} --mincm ${params.tsktrueibd_mincm} ${d.chrno}.trees
+    sim_multiple_pop.py $cmd_options
+
+    mkdir tmp; mv tmp_* tmp/
     """
     stub:
-    """touch  ${d.chrno}.ibd ${d.chrno}.map ${d.chrno}.log"""
+    def prefix="${args.genome_set_id}_${chrno}"
+    """
+    touch ${prefix}{.trees,.vcf.gz,.daf,.restart_count,_demog.png}
+    """
 }
+
+process CALL_IBD_TSINFERIBD {
+    tag  "${args.genome_set_id}_${chrno}_tsinferibd"
+    publishDir "${resdir}/${label}/ibd/tsinferibd/", \
+        mode: "symlink", pattern: "*_tsinferibd.ibd"
+    input:
+    tuple val(label), val(chrno), val(args), path(vcf), path(true_ne_df)
+    output:
+    tuple val(label), val(chrno), path("*_tsinferibd.ibd"), emit: ibd
+    tuple val(label), val(chrno), path("*_tsinferibd.ibd_maxtmrca_*"), emit: ibd_extra
+    tuple val(label), val(chrno), path("*_tsinfer.trees"), emit: trees
+    script:
+    def cmd_options_tsinfer = [
+        vcf_files: vcf,
+        r: args.r,
+        u: args.u,
+        ne: true_ne_df ?: mp_ne(args),
+    ].collect{k,v -> "--${k} $v"}.join(" ")
+    // Note passing [] to true_ne signals multiple-pop simulation.
+    // A Ne value is caluated from simulation args, see function `mp_ne`
+    // defined above the process definitions
+    def max_tmrmca_str =  params.tsinferibd_max_tmrca.join(" ")
+    def cmd_options_tskibd = [
+        tree: "${chrno}.trees",
+        chrno: chrno,
+        r: args.r,
+        seqlen: args.seqlen,
+        mincm: params.mincm,
+        genome_set_id: args.genome_set_id,
+        max_tmrca: max_tmrmca_str
+    ].collect{k,v -> "--${k} $v"}.join(" ")
+    def prefix = "${args.genome_set_id}_${chrno}"
+    // first infer trees, then call IBD from inferred trees
+    """
+    tsinfer_tsdate_gw.py ${cmd_options_tsinfer} # output ${chrno}.trees
+    call_tskibd.py ${cmd_options_tskibd}
+
+    mv ${chrno}.trees ${prefix}_tsinfer.trees
+    mv ${prefix}_tskibd.ibd ${prefix}_tsinferibd.ibd
+
+    # extra files
+    if [ -n "${max_tmrmca_str}" ] ; then
+        for tmrca in ${max_tmrmca_str}; do
+            mv ${prefix}_tskibd.ibd_maxtmrca_\${tmrca} \
+                ${prefix}_tsinferibd.ibd_maxtmrca_\${tmrca}
+        done
+    fi
+    """
+
+    stub:
+    def max_tmrmca_str =  params.tsinferibd_max_tmrca.join(" ")
+    def prefix = "${args.genome_set_id}_${chrno}"
+    """touch  ${prefix}_tsinferibd.ibd ${prefix}_tsinfer.trees
+
+    # extra files
+    if [ -n "${max_tmrmca_str}" ] ; then
+        for tmrca in ${max_tmrmca_str}; do
+            touch  ${prefix}_tsinferibd.ibd_maxtmrca_\${tmrca}
+        done
+    fi
+
+    """
+}
+
 process CALL_IBD_HAPIBD {
-    tag "simu_${d.label}_${d.chrno}_${d.ibdcaller}"
-    publishDir "$params.outdir/${d.label}/s3_seqbased_raw_ibd/${d.ibdcaller}/${d.chrno}", mode: 'copy'
+    tag "${args.genome_set_id}_${chrno}_hapibd"
+    publishDir "${resdir}/${label}/ibd/hapibd/", \
+        mode: "symlink", pattern: "*_hapibd.ibd"
     input:
-    tuple val(d), path(vcf)
-    output: 
-    tuple val(d), path("${d.chrno}.ibd"), emit: raw_ibd
-    tuple val(d), path("${d.chrno}.map"), emit: gmap
-    tuple val(d), path("${d.chrno}.log"), emit: log
-    script: 
-        """
-        call_hapibd.py --vcf ${vcf} --bp_per_cm ${d.bp_per_cm} --seqlen_in_cm ${d.seqlen_in_cm} --chrno ${d.chrno} \\
-            --minseed ${params.hapibd_minseed} --minoutput ${params.hapibd_minoutput} --maxgap ${params.hapibd_maxgap} \\
-            --minextend ${params.hapibd_minextend} --minmarkers ${params.hapibd_minmarkers} \\
-            --mem_gb ${task.memory.giga} --nthreads ${task.cpus}
-        """
+    tuple val(label), val(chrno), val(args), path(vcf)
+    output:
+    tuple val(label), val(chrno), path("*_hapibd.ibd")
+    script:
+    def cmd_options = [
+        vcf: vcf,
+        r: args.r,
+        chrno: chrno,
+        seqlen: args.seqlen,
+        minseed: params.hapibd_minseed,
+        minoutput: params.hapibd_minoutput,
+        maxgap: params.hapibd_maxgap,
+        minextend: params.hapibd_minextend,
+        minmarkers: params.hapibd_minmarkers,
+        mem_gb: task.memory.giga,
+        nthreads: task.cpus,
+        genome_set_id: args.genome_set_id,
+    ].collect{k, v -> "--${k} ${v}"}.join(" ")
+    """
+    call_hapibd.py $cmd_options
+    """
+
     stub:
-    """touch  ${d.chrno}.ibd ${d.chrno}.map ${d.chrno}.log"""
+    """touch ${args.genome_set_id}_${chrno}_hapibd.ibd"""
+}
+
+process CALL_IBD_TSKIBD {
+    tag "${args.genome_set_id}_${chrno}_tskibd"
+    publishDir "${resdir}/${label}/ibd/tskibd/", \
+        mode: "symlink", pattern: "*_tskibd.ibd"
+    input:
+    tuple val (label), val(chrno), val(args), path(trees)
+    output:
+    tuple val(label), val(chrno), path("*_tskibd.ibd")
+    script:
+    def cmd_options_tskibd = [
+        tree: trees,
+        chrno: chrno,
+        r: args.r,
+        seqlen: args.seqlen,
+        mincm: params.mincm,
+        genome_set_id: args.genome_set_id,
+    ].collect{k, v -> "--${k} ${v}"}.join(" ")
+
+    """
+    call_tskibd.py ${cmd_options_tskibd}
+    """
+    stub:
+    def prefix = "${args.genome_set_id}_${chrno}"
+    """touch  ${prefix}_tskibd.ibd"""
 }
 process CALL_IBD_REFINEDIBD {
-    tag "simu_${d.label}_${d.chrno}_${d.ibdcaller}"
-    publishDir "$params.outdir/${d.label}/s3_seqbased_raw_ibd/${d.ibdcaller}/${d.chrno}", mode: 'copy'
+    tag "${args.genome_set_id}_${chrno}_refinedibd"
+    publishDir "${resdir}/${label}/ibd/refinedibd/", \
+        mode: "symlink", pattern: "*_refinedibd.ibd"
     input:
-    tuple val(d), path(vcf)
-    output: 
-    tuple val(d), path("${d.chrno}.ibd"), emit: raw_ibd
-    tuple val(d), path("${d.chrno}.map"), emit: gmap
-    tuple val(d), path("${d.chrno}.log"), emit: log
-    script: 
-        """
-        call_refinedibd.py --vcf ${vcf} --bp_per_cm ${d.bp_per_cm} --seqlen_in_cm ${d.seqlen_in_cm} --chrno ${d.chrno} \\
-            --length ${params.refinedibd_length} --lod ${params.refinedibd_lod} --scale ${params.refinedibd_scale} \\
-            --mem_gb ${task.memory.giga} --nthreads ${task.cpus}
-        """
+    tuple val(label), val(chrno), val(args), path(vcf)
+    output:
+    tuple val(label), val(chrno), path("*_refinedibd.ibd")
+    script:
+    def cmd_options = [
+        vcf: vcf,
+        r: args.r,
+        seqlen: args.seqlen,
+        chrno: chrno,
+        lod: params.refinedibd_lod,
+        length: params.refinedibd_length,
+        scale: params.refinedibd_scale,
+        mem_gb: task.memory.giga,
+        nthreads: task.cpus,
+        genome_set_id: args.genome_set_id,
+    ].collect{k, v -> "--${k} ${v}"}.join(" ")
+    """
+    call_refinedibd.py ${cmd_options}
+    """
     stub:
-    """touch  ${d.chrno}.ibd ${d.chrno}.map ${d.chrno}.log"""
+    """touch ${args.genome_set_id}_${chrno}_refinedibd.ibd"""
 }
 
 process CALL_IBD_TPBWT {
-    tag "simu_${d.label}_${d.chrno}_${d.ibdcaller}"
-    publishDir "$params.outdir/${d.label}/s3_seqbased_raw_ibd/${d.ibdcaller}/${d.chrno}", mode: 'copy'
+    tag "${args.genome_set_id}_${chrno}_tpbwtibd"
+    publishDir "${resdir}/${label}/ibd/tpbwtibd/", \
+        mode: "symlink", pattern: "*_tpbwtibd.ibd"
     input:
-    tuple val(d), path(vcf)
-    output: 
-    tuple val(d), path("${d.chrno}.ibd"), emit: raw_ibd
-    tuple val(d), path("${d.chrno}.map"), emit: gmap
-    tuple val(d), path("${d.chrno}.log"), emit: log
-    script: 
-        """
-        call_tpbwt.py --vcf ${vcf} --bp_per_cm ${d.bp_per_cm} --seqlen_in_cm ${d.seqlen_in_cm} --chrno ${d.chrno} \\
-            --template ${params.tpbwt_template_opts} --Lm ${params.tpbwt_Lm} --Lf ${params.tpbwt_Lf} \\
-            --mem_gb ${task.memory.giga} --nthreads ${task.cpus}
-        """
+    tuple val(label), val(chrno), val(args), path(vcf)
+    output:
+    tuple val(label), val(chrno), path("*_tpbwtibd.ibd")
+    script:
+    def cmd_options = [
+        vcf: vcf,
+        r: args.r,
+        seqlen: args.seqlen,
+        chrno: chrno,
+        template: params.tpbwt_template_opts,
+        Lm: params.tpbwt_Lm,
+        Lf: params.tpbwt_Lf,
+        mem_gb: task.memory.giga,
+        nthreads: task.cpus,
+        genome_set_id: args.genome_set_id,
+    ].collect{k, v -> "--${k} ${v}"}.join(" ")
+    """
+    call_tpbwt.py ${cmd_options}
+    """
     stub:
-    """touch  ${d.chrno}.ibd ${d.chrno}.map ${d.chrno}.log"""
+    """touch ${args.genome_set_id}_${chrno}_tpbwtibd.ibd"""
 }
 
 process CALL_IBD_HMMIBD {
-    tag "simu_${d.label}_${d.chrno}_${d.ibdcaller}"
-    publishDir "$params.outdir/${d.label}/s3_seqbased_raw_ibd/${d.ibdcaller}/${d.chrno}", mode: 'copy'
+    tag "${args.genome_set_id}_${chrno}_hmmibd"
+    publishDir "${resdir}/${label}/ibd/hmmibd/", \
+        mode: "symlink", pattern: "*_hmmibd.ibd"
     input:
-    tuple val(d), path(vcf)
-    output: 
-    tuple val(d), path("${d.chrno}.ibd"), emit: raw_ibd
-    tuple val(d), path("${d.chrno}.map"), emit: gmap
-    tuple val(d), path("${d.chrno}.log"), emit: log
-    script: 
+    tuple val(label), val(chrno), val(args), path(vcf)
+    output:
+    tuple val(label), val(chrno), path("*_hmmibd.ibd")
+    script:
+    def cmd_options = [
+        vcf: vcf,
+        r: args.r,
+        seqlen: args.seqlen,
+        chrno: chrno,
+        n: params.hmmibd_n,
+        m: params.hmmibd_m,
+        mincm: params.mincm,
+        genome_set_id: args.genome_set_id,
+    ].collect{k, v -> "--${k} ${v}"}.join(" ")
+    script:
         """
-        call_hmmibd.py --vcf ${vcf} \\
-            --bp_per_cm ${d.bp_per_cm} --seqlen_in_cm ${d.seqlen_in_cm} --chrno ${d.chrno} \\
-            --n ${params.hmmibd_n} --m ${params.hmmibd_m} --mincm ${params.mincm}
+        call_hmmibd.py ${cmd_options}
         """
     stub:
-    """touch  ${d.chrno}.ibd ${d.chrno}.map ${d.chrno}.log"""
+    """touch ${args.genome_set_id}_${chrno}_hmmibd.ibd"""
 }
 
 process CALL_IBD_ISORELATE {
-    tag "simu_${d.label}_${d.chrno}_${d.ibdcaller}"
-    publishDir "$params.outdir/${d.label}/s3_seqbased_raw_ibd/${d.ibdcaller}/${d.chrno}", mode: 'copy'
+    tag "${args.genome_set_id}_${chrno}_isorelate"
+    publishDir "${resdir}/${label}/ibd/isorelate/", \
+        mode: "symlink", pattern: "*_isorelate.ibd"
     input:
-    tuple val(d), path(vcf)
-    output: 
-    tuple val(d), path("${d.chrno}.ibd"), emit: raw_ibd
-    tuple val(d), path("${d.chrno}.map"), emit: gmap
-    tuple val(d), path("${d.chrno}.log"), emit: log
-    script: 
-        """
-        call_isorelate.py --vcf ${vcf} \\
-            --bp_per_cm ${d.bp_per_cm} --seqlen_in_cm ${d.seqlen_in_cm} --chrno ${d.chrno} \\
-            --cpus ${task.cpus} --min_snp ${params.isorelate_min_snp} --min_len_bp ${Math.round(params.mincm * d.bp_per_cm)} \\
-            --maf ${params.maf} --imiss ${params.isorelate_imiss} --vmiss ${params.isorelate_vmiss}
-        """
-    stub:
-    """touch  ${d.chrno}.ibd ${d.chrno}.map ${d.chrno}.log"""
-}
-
-process CMP_TRUE_AND_INFERRED_RAW_IBD {
-    tag         "cmp_ibd_${d_infer.label}_${d_infer.chrno}_${d_infer.src}"
-    publishDir  "${params.outdir}/${d_infer.label}/S3_cmp_ibd/${d_infer.chrno}/${d_infer.src}", mode: 'copy'
-    input:      tuple val(d_infer), path(ibd_infer, stageAs: 'inferred*.ibd'), path(ibd_true, stageAs: 'true*.ibd')
-        // use stageAs to avoid name collison
-    output: 
-                tuple val(d_infer), path('*false_neg.tsv'), path('*false_pos.tsv'), path('*binned_totalibd.tsv'), path('*chr_wide_error.tsv'), emit: tables
-                tuple val(d_infer), path('*plot.png'), emit: images
-
-    script: 
-    def n_infer_ibd_files = (ibd_infer instanceof List) ? ibd_infer.size() : 1
-    def genome_size_cm = d_infer.seqlen_in_cm * n_infer_ibd_files
-    def tmrca_opt1 = d_infer.min_tmrca ? "--min_tmrca ${d_infer.min_tmrca}" : ''
-    def tmrca_opt2 = d_infer.max_tmrca ? "--max_tmrca ${d_infer.max_tmrca}" : ''
-    """
-    cmp_ibd.py --raw_true_ibd ${ibd_true} --raw_detected_ibd ${ibd_infer} --bp_per_cm ${d_infer.bp_per_cm} --genome_size_cm ${genome_size_cm} \\
-        ${tmrca_opt1} ${tmrca_opt2} --out_prefix ${d_infer.src}_${d_infer.chrno}_
-    """
-    stub:
-    """
-    touch  ${d_infer.src}_${d_infer.chrno}_false_neg.tsv
-    touch  ${d_infer.src}_${d_infer.chrno}_false_pos.tsv
-    touch  ${d_infer.src}_${d_infer.chrno}_binned_totalibd.tsv
-    touch  ${d_infer.src}_${d_infer.chrno}_chr_wide_error.tsv
-    touch  ${d_infer.src}_${d_infer.chrno}_plot.png
-    """
-}
-
-process FIND_PEAKS {
-    tag "simu_${d.label}_${d.chrno}"
-    publishDir "$params.outdir/${d.label}/s4_find_peaks_hapibd/${d.chrno}", mode: 'copy'
-    input:
-    tuple val (d), path(ibd)
+    tuple val(label), val(chrno), val(args), path(vcf)
     output:
-    tuple val(d), path("*peaks.bed"), emit: ibd_peaks
-    tuple val(d), path("*peaks.png"), emit: ibd_peak_plot
+    tuple val(label), val(chrno), path("*_isorelate.ibd")
+    script:
+    def cmd_options = [
+        vcf: vcf,
+        r: args.r,
+        seqlen: args.seqlen,
+        chrno: chrno,
+        min_snp: params.isorelate_min_snp,
+        min_len_bp: Math.round(params.mincm * (0.01/args.r)),
+        maf: params.maf,
+        imiss: params.isorelate_imiss,
+        vmiss: params.isorelate_vmiss,
+        cpus: task.cpus,
+        genome_set_id: args.genome_set_id,
+    ].collect{k, v -> "--${k} ${v}"}.join(" ")
+    """
+    call_isorelate.py ${cmd_options}
+    """
+    stub:
+    """touch ${args.genome_set_id}_${chrno}_isorelate.ibd"""
+}
+
+process CMP_TRUE_AND_INFERRED_IBD {
+    tag "${args.genome_set_id}_${ibdcaller}_cmpibd"
+    publishDir "${resdir}/${label}/ibdcmp/", \
+        mode: "symlink", pattern: "*ibdcmpobj.gz"
+
+    input:
+    tuple val(label), val(ibdcaller), path(inferred_ibd_lst), \
+          path(true_ibd_lst, stageAs: "trueibd??.ibd"), val(args)
+    output:
+    tuple val(label), val(ibdcaller), path("*.ibdcmpobj.gz")
 
     script:
+    def cmd_options = [
+        true_ibd_lst: true_ibd_lst,
+        inferred_ibd_lst: inferred_ibd_lst,
+        r: args.r,
+        seqlen: args.seqlen,
+        nchroms: params.nchroms,
+        ibdcaller: ibdcaller,
+        genome_set_id: args.genome_set_id,
+    ].collect{k, v -> "--${k} ${v}"}.join(" ")
+
     """
-    find_ibd_peaks.py --raw_ibd ${ibd} --chr_name ${d.chrno} --chr_end ${d.seqlen_in_cm * d.bp_per_cm} --out_bed ${d.chrno}_peaks.bed
+    cmp_ibd.py ${cmd_options}
     """
     stub:
     """
-    touch  ${d.chrno}_peaks.bed ${d.chrno}_peaks.png
+    touch ${args.genome_set_id}_${ibdcaller}.ibdcmpobj.gz
     """
 }
 
-process RM_HIGHLY_RELATED {
-    tag "simu_${dd[1].label}_${dd[1].src}"
-    publishDir "$params.outdir/${dd[1].label}/s4_rm_highly_related/${dd[1].src}", mode: 'copy'
+process PROC_DIST_NE {
+    tag "${args.genome_set_id}_${ibdcaller}"
+
+    publishDir "${resdir}/${label}/ne_input/${ibdcaller}", \
+            pattern: "*.sh", mode: "symlink"
+    publishDir "${resdir}/${label}/ne_input/${ibdcaller}", \
+            pattern: "*.map", mode: "symlink"
+    publishDir "${resdir}/${label}/ne_input/${ibdcaller}", \
+            pattern: "*.ibd.gz", mode: "symlink"
+    publishDir "${resdir}/${label}/ibddist_ibd/${ibdcaller}", \
+            pattern: "*_ibddist_ibd.pq", mode: "symlink"
+    publishDir "${resdir}/${label}/ibdcov/${ibdcaller}",\
+            pattern: "*.cov.pq", mode: "symlink"
+
     input:
-    tuple val(dd), path(ibds) // should be sorted according chrno 
+        tuple val(label), val(ibdcaller), path(ibd_lst), val(args)
     output:
-    tuple val(dd), path('rm/*.ibd')
-
+        tuple val(label), val(ibdcaller), path("ibdne.jar"), path("*_orig.sh"), \
+                path("*_orig.map"), path("*_orig.ibd.gz"), emit: ne_input_orig
+        tuple val(label), val(ibdcaller), path("ibdne.jar"), path("*_rmpeaks.sh"),  \
+                path("*_rmpeaks.map"), path("*_rmpeaks.ibd.gz"), emit: ne_input_rmpeaks
+        tuple val(label), val(ibdcaller), path("*_ibddist.ibdobj.gz"), emit: ibddist_ibd_obj
+        tuple val(label), val(ibdcaller), path("*.ibdcov.ibdobj.gz"), emit: cov_ibd_obj
+        tuple val(label), val(ibdcaller), path("*.ibdne.ibdobj.gz"), emit: ne_ibd_obj
     script:
+    def cmd_options = [
+        ibd_files: "${ibd_lst}", // path is a blank separate list
+        genome_set_id: args.genome_set_id,
+        ibdne_mincm: params.ibdne_mincm,
+        ibdne_minregion: params.ibdne_minregion,
+        r: args.r,
+        seqlen: args.seqlen,
+        nchroms: params.nchroms,
+    ].collect{k, v-> "--${k} ${v}"}.join(" ")
     """
-    mkdir rm
-    rm_highly_related.py --raw_ibd_files ${ibds} --outdir rm 
+    proc_dist_ne.py ${cmd_options}
     """
     stub:
     """
-    mkdir rm
-    touch rm/{1..${dd[1].num_chr}}.ibd 
+    touch ibdne.jar
+    touch ${args.genome_set_id}{_orig.sh,_orig.map,_orig.ibd.gz}
+    touch ${args.genome_set_id}{_rmpeaks.sh,_rmpeaks.map,_rmpeaks.ibd.gz}
+    touch ${args.genome_set_id}_ibddist_ibd.pq
+    touch ${args.genome_set_id}_ibddist.ibdobj.gz
+    touch ${args.genome_set_id}_orig_all.ibdcov.ibdobj.gz
+    touch ${args.genome_set_id}_orig_unrel.ibdcov.ibdobj.gz
+    touch ${args.genome_set_id}_orig.ibdne.ibdobj.gz
+    touch ${args.genome_set_id}_rmpeaks.ibdne.ibdobj.gz
     """
 }
 
-process PROC_IBD {
-    tag "simu_${d.label}_${d.src}_${d.proc_label}_${d.chrno}"
-    publishDir "$params.outdir/${d.label}/s4_proc_ibd/${d.src}/${d.proc_label}/${d.chrno}", mode: 'copy'
+process PROC_INFOMAP {
+    tag  "${args.genome_set_id}_${ibdcaller}"
+
+    publishDir "${resdir}/${label}/ifm_input/${ibdcaller}", \
+        pattern: "*.ibdobj.gz", mode: "symlink"
+
     input:
-    tuple val (d), path("${d.chrno}.ibd"), path(peaks)
+        tuple val(label), val(ibdcaller), path(ibd_lst), val(args)
     output:
-    tuple val(d), path("${d.chrno}.ibd_proc"),path("${d.chrno}.map_proc"), emit: proc_ibd
-    tuple val(d), path("${d.chrno}.targets_cut"), emit: targets
-
+        tuple val(label), val(ibdcaller), path("*_ifm_orig.ibdobj.gz"),\
+            emit: ifm_orig_ibd_obj
+        tuple val(label), val(ibdcaller), path("*_ifm_rmpeaks.ibdobj.gz"),\
+            emit: ifm_rmpeaks_ibd_obj
     script:
-    def need_to_remove_old_ibd = d.ibd_tmrca_cutoff ? 'true' : 'false'
-    def use_peaks = (d.ibd_cut_mode == "autocut_hapibd") && (peaks) 
-    def peak_params = use_peaks ? "--peaks_to_rm ${peaks}" : ""
+    def cmd_options = [
+        ibd_files: "${ibd_lst}", // path is a blank separate list
+        genome_set_id: args.genome_set_id,
+        r: args.r,
+        seqlen: args.seqlen,
+        nchroms: params.nchroms,
+    ].collect{k, v-> "--${k} ${v}"}.join(" ")
     """
-    if ${need_to_remove_old_ibd}; then
-        mv ${d.chrno}.ibd all_${d.chrno}.ibd 
-        awk 'NR==1 || \$6 <= ${d.ibd_tmrca_cutoff} {print} ' all_${d.chrno}.ibd > ${d.chrno}.ibd
-    fi
-    if [ \$(head ${d.chrno}.ibd | wc -l) -eq 1 ]; then 
-        touch ${d.chrno}.ibd_proc ${d.chrno}.map_proc ${d.chrno}.targets_cut
-        exit 0
-    fi
-    proc_ibd.py --chrno ${d.chrno} --bp_per_cm ${d.bp_per_cm} --ibd_in ${d.chrno}.ibd \
-        --ibd_cut_mode ${d.ibd_cut_mode} --cut_start ${d.cut_start} --cut_end ${d.cut_end} \
-        ${peak_params}
+    proc_infomap.py ${cmd_options}
     """
     stub:
     """
-    touch ${d.chrno}.ibd_proc ${d.chrno}.map_proc ${d.chrno}.targets_cut
+    touch ${args.genome_set_id}{_ifm_orig.ibdobj.gz,_ifm_rmpeaks.ibdobj.gz}
     """
 }
 
+process RUN_IBDNE {
+    tag  "${args.genome_set_id}_${ibdcaller}_${are_peaks_removed}"
 
-process CALL_IBDNE {
-    tag "ne_${d.label}_${d.proc_label}_${d.src}"
-    publishDir "${params.outdir}/${d.label}/s5_call_ne/${d.src}/${d.proc_label?: "no_proc"}", mode: 'copy'
-    input: 
-    tuple val(d), path("ibd_files/*" ), path("map_files/*")
+    publishDir "${resdir}/${label}/ne_output/${ibdcaller}", mode: "symlink"
+
+    input:
+    tuple val(label), val(ibdcaller), \
+        path(ibdne_jar), path(ibdne_sh), path(gmap), path(ibd_gz), \
+        val(are_peaks_removed), val(args)
     output:
-    tuple val(d), path("ne_res.ne"), emit: ne
-    tuple val(d), path("ne_res.region.excl"), emit: region_excl
-    tuple val(d), path("ne_res.pair.excl"), emit: pair_excl
-    tuple val(d), path("ne_res.boot"),path("ne_res.log"), emit: others
-
+    tuple val(label), val(ibdcaller), val(are_peaks_removed), path("*.ne")
     script:
     """
-    set -eux
-    cat map_files/{1..${d.num_chr}}.map_proc > all.map
-    set +e # stop exit on error
-    cat ibd_files/{1..${d.num_chr}}.ibd_proc | java -Xmx${task.memory.giga}G \\
-    	-jar ${projectDir}/lib/ibdne.23Apr20.ae9.jar \\
-    	map=all.map out=ne_res nthreads=${task.cpus} minregion=${d.minregion} \\
-        mincm=${params.ibdne_mincm}  2>captured_err.txt
-    #
-    # when ibdne fails due to no IBD segment, exit 0 and touch needed files
-    ret=\$?
-    grep -e 'ERROR: No IBD segments remain after applying filters' captured_err.txt
-    match=\$?
-    if [ \$ret -ne 0 ] && [ \$match -eq 0 ]; then 
-        touch ne_res.ne ne_res.region.excl ne_res.pair.excl ne_res.boot ne_res.log
-        >&2 cat captured_err.txt
-    fi
-
-    """ 
-    stub: 
+    bash ${ibdne_sh}
     """
-    touch ne_res.{ne,region.excl,pair.excl,boot,log}
+    stub:
+    def src = are_peaks_removed ? "rmpeaks": "orig"
+    """
+    touch ${label}_${src}.ne
     """
 }
 
+process RUN_INFOMAP {
+    tag  "${args.genome_set_id}_${ibdcaller}_${are_peaks_removed}"
+
+    publishDir "${resdir}/${label}/ifm_output/${ibdcaller}",  mode: "symlink"
+    input:
+    tuple val(label), val(ibdcaller), path(ibd_obj), val(are_peaks_removed), \
+            val(args)
+    output:
+    tuple val(label), val(ibdcaller), val(are_peaks_removed), path("*_member.pq")
+    script:
+    def meta = params.meta ? file(params.meta) : ""
+    def cut_mode = are_peaks_removed? "rmpeaks": "orig"
+    def cmd_options = [
+        ibd_obj: ibd_obj,
+        meta: meta,
+        genome_set_id: args.genome_set_id,
+        cut_mode: cut_mode,
+        ntrails: params.ifm_ntrails,
+        transform: params.ifm_transform,
+        ifm_mincm: params.ifm_mincm,
+        ifm_mingwcm: params.ifm_mingwcm,
+    ].collect{k, v-> v ? "--${k} ${v}": " "}.join(" ")
+    """
+    run_infomap.py ${cmd_options}
+    """
+    stub:
+    def cut_mode = are_peaks_removed? "rmpeaks": "orig"
+    """
+    touch ${args.genome_set_id}_${cut_mode}_member.pq
+    """
+}
+
+
+/*
 process SUMMARIZE_TREES {
     tag "treeseq_summary_${label}"
-    publishDir "${params.outdir}/${label}/s6_summarize_treeseq", mode: 'copy'
-    publishDir "${params.outdir}/summary/summarize_TreeSeq", mode: 'copy'
+    publishDir "${params.outdir}/${label}/s6_summarize_treeseq", mode: "copy"
+    publishDir "${params.outdir}/summary/summarize_TreeSeq", mode: "copy"
     input:
     tuple val(label), stdin
     output:
-    tuple path('*.png'), path('*.tsv')
+    tuple path("*.png"), path("*.tsv")
     script:
     """
     cat - > info.tsv
@@ -398,12 +620,12 @@ process SUMMARIZE_TREES {
 
 process SUMMARIZE_IBD {
     tag "ibd_summary_${label}"
-    publishDir "${params.outdir}/${label}/s7_summarize_ibd", mode: 'copy'
-    publishDir "${params.outdir}/summary/summarize_IBD", mode: 'copy'
+    publishDir "${params.outdir}/${label}/s7_summarize_ibd", mode: "copy"
+    publishDir "${params.outdir}/summary/summarize_IBD", mode: "copy"
     input:
     tuple val(label), stdin
     output:
-    tuple path('*.png'), path('*.tsv')
+    tuple path("*.png"), path("*.tsv")
     script:
     """
     cat - > info.tsv
@@ -417,13 +639,13 @@ process SUMMARIZE_IBD {
 
 process SUMMARIZE_NE {
     tag "ne_summary_${label}"
-    publishDir "${params.outdir}/${label}/s8_summarize_ne", mode: 'copy'
-    publishDir "${params.outdir}/summary/summarize_NE", mode: 'copy'
-    input: 
-    tuple val(label), stdin 
+    publishDir "${params.outdir}/${label}/s8_summarize_ne", mode: "copy"
+    publishDir "${params.outdir}/summary/summarize_NE", mode: "copy"
+    input:
+    tuple val(label), stdin
     file(true_ne_tsv)
-    output: 
-    tuple path('*.png'), path('*.tsv')
+    output:
+    tuple path("*.png"), path("*.tsv")
     script:
     """
     cat - > info.tsv
@@ -434,400 +656,265 @@ process SUMMARIZE_NE {
     touch out.png out.tsv
     """
 }
+*/
 
-workflow SELECTION_EFFECTS_USING_TRUEIBD {
+workflow WF_SP {
 
-    def new_defaults = [s: 0.3, num_origins: 1, s_start_g: 80, N0: 1000]
-    def params_dict = params.simulation_defaults + new_defaults
+    main:
 
-    ch_different_s = channel.fromList([
-        [s: 0,   label: 'diff_s_00'],
-        [s: 0.1, label: 'diff_s_01'],
-        [s: 0.2, label: 'diff_s_02'],
-        [s: 0.3, label: 'diff_s_03'],
-        [s: 0.4, label: 'diff_s_04'],
-    ])
+    // *********************** Log Params *************************
+    ch_sp_sets = Channel.fromList(sp_sets.collect {label, args->[label, args]})
+    if(params.test) { ch_sp_sets = ch_sp_sets.take(1) }
 
-    ch_different_norigs = channel.fromList([
-        [ s : 0.0,          label: 'diff_norig_0'],
-        [ num_origins: 1,   label: 'diff_norig_1'],
-        [ num_origins: 3,   label: 'diff_norig_3'],
-        [ num_origins: 9,   label: 'diff_norig_9'],
-        [ num_origins: 27,  label: 'diff_norig_27'],
-        [ num_origins: 81,  label: 'diff_norig_81'],
-        [ num_origins: 243, label: 'diff_norig_243'],
-    ])
+    Channel.value(['label'] + sp_set_args_keys)
+        .concat( ch_sp_sets.map{k, args -> 
+            [k] + sp_set_args_keys.collect{i -> args[i]} }
+        )
+        .map{lst-> lst.join("\t")}
+        .collectFile(name: "sp_sets.tsv", newLine: true, storeDir: resdir, sort:false)
 
-    ch_different_g = channel.fromList([
-        [ s: 0.0,         label: 'diff_g_00'],
-        [ s_start_g: 10,  label: 'diff_g_10'],
-        [ s_start_g: 40,  label: 'diff_g_40'],
-        [ s_start_g: 80,  label: 'diff_g_80'],
-        [ s_start_g: 120, label: 'diff_g_120'],
-        [ s_start_g: 160, label: 'diff_g_160'],
-    ])
+    // ***********************Simulation *************************
 
-    ch_simu_set1 = ch_different_s.map{ d2 -> params_dict + d2 }
-    ch_simu_set2 = ch_different_norigs.map{ d2 -> params_dict + d2 }
-    ch_simu_set3 = ch_different_g.map{ d2 -> params_dict + d2 }
-    ch_simu_sets = ch_simu_set1.concat(ch_simu_set2).concat(ch_simu_set3)
+    ch_chrs = Channel.fromList(1..(params.nchroms))
 
-    ch_diff_proc = channel.fromList([
-        [ibd_cut_mode: 'nocut',   proc_label: 'nocut'],
-        [ibd_cut_mode: 'autocut', proc_label: 'autocut']
-    ])
+    ch_sp_input = ch_sp_sets
+        .combine( ch_chrs )
+        .map {label, args, chrno -> [label, chrno, args]}
 
-    ch_simu_chr = ch_simu_sets.flatMap{d-> 
-        (1..(d.num_chr)).collect{ d + [chrno:it] }
-    }
+    SIM_SP_CHR(ch_sp_input)
 
-    // allow $params.num_neutral_chrs chromosomes to be neutral while the rest to be under selection
-    ch_simu_chr = ch_simu_chr.map {d ->
-        if (d.chrno <= params.num_neutral_chrs){
-            d.s = 0
-            d.num_origins = 0
-            d.h = 0
-            d.s_start_g = 0
+
+    // *********************** Call ibd *************************
+    ch_trees_vcf = SIM_SP_CHR.out.trees_vcf // label, chrno, trees, vcf
+    ch_true_ne = SIM_SP_CHR.out.true_ne
+        .filter { label, chrno,true_ne-> chrno == 1}
+        .map{label, chrno,true_ne-> [label, true_ne]}
+
+    ch_in_ibdcall_trees = ch_trees_vcf
+        .combine(ch_sp_sets, by:0)
+        .map{label, chrno, trees, vcf, args -> [label, chrno, args, trees] }
+
+    ch_in_ibdcall_vcf = ch_trees_vcf
+        .combine(ch_sp_sets, by:0)
+        .map{label, chrno, trees, vcf, args -> [label, chrno, args, vcf] }
+
+    ch_in_ibdcall_vcf_with_ne = ch_in_ibdcall_vcf
+        .combine(ch_true_ne, by: 0)
+        // label, chrno, args, vcf, true_ne
+
+    CALL_IBD_TSINFERIBD(ch_in_ibdcall_vcf_with_ne)
+    CALL_IBD_HAPIBD(ch_in_ibdcall_vcf)
+    CALL_IBD_TSKIBD(ch_in_ibdcall_trees)
+    CALL_IBD_REFINEDIBD(ch_in_ibdcall_vcf)
+    CALL_IBD_TPBWT(ch_in_ibdcall_vcf)
+    CALL_IBD_HMMIBD(ch_in_ibdcall_vcf)
+    CALL_IBD_ISORELATE(ch_in_ibdcall_vcf)
+
+
+    // ********************** Compare ibd ***************************
+
+
+    ch_out_ibd_grp = \
+            CALL_IBD_TSINFERIBD.out.ibd.map{it + ["tsinferibd"]}
+        .concat(
+            // parse extra_files and get maxtrmca and append to ibdcaller name
+            CALL_IBD_TSINFERIBD.out.ibd_extra
+                .flatMap{ label, chrno, extra_ibd ->
+                    // Note: extra_ibd can a path or a list of Path
+                    def lst = (extra_ibd instanceof List) ? extra_ibd: [extra_ibd]
+                    return lst.collect{ibd ->
+                        def maxtmrca = get_maxtmrca(ibd)
+                        def ibdcaller = "tskinferibd${maxtmrca}"
+                        [label, chrno, ibd, ibdcaller]
+                    }
+            },
+            CALL_IBD_HAPIBD.out.map{it + ["hapibd"]},
+            CALL_IBD_TSKIBD.out.map{it + ["tskibd"]},
+            CALL_IBD_REFINEDIBD.out.map{it+ ["refinedibd"]},
+            CALL_IBD_TPBWT.out.map{it + ["tpbwt"]},
+            CALL_IBD_HMMIBD.out.map{it + ["hmmibd"]},
+            CALL_IBD_ISORELATE.out.map{it+["isorelate"]}
+        )
+        .map{label, chrno, ibd, ibdcaller ->
+            def key =  groupKey([label, ibdcaller], params.nchroms)
+            def data = [chrno, ibd]
+            return [key, data]}
+        .groupTuple(by: 0, sort: {a, b -> a[0] <=> b[0]})
+        .map {key, data_lst ->
+            def label = key[0]
+            def ibdcaller = key[1]
+            def ibd_lst = data_lst.collect{data -> data[1]}
+            return [label, ibdcaller, ibd_lst]
         }
-        d
-    }
 
-    ch_simu_chr 
-    | SIMULATE_CHR
 
-    ch_trees = SIMULATE_CHR.out.trees.map {d, trees -> [ d + ['src': 'true_tree'], trees ]}
-    in_ch_for_summarize_trees = ch_trees
-        .map {d, trees -> 
-            def simlabel = d.label
-            def str = "${d.label}\t${d.src}\t${d.chrno}\t${trees.toAbsolutePath()}"
-            return [groupKey(simlabel, d.num_chr), str]
-        }
-        .groupTuple()
-        .map {simlabel, str_list-> [simlabel, str_list.sort().join('\n')]}
-    
-    in_ch_for_summarize_trees 
-    | SUMMARIZE_TREES
+    ch_trueibd = ch_out_ibd_grp
+        .filter{it[1] == "tskibd"}.map{it-> [it[0], it[2]]} // label, trueibd_list
 
-    ch_trees 
-    | CALC_RAW_IBD
+    ch_in_cmpibd = ch_out_ibd_grp.combine(ch_trueibd, by: 0).combine(ch_sp_sets, by:0)
+    // label, ibdcaller, ibd_lst, trueibd_lst, args
 
-    ch_raw_ibd = CALC_RAW_IBD.out.raw_ibd
+    CMP_TRUE_AND_INFERRED_IBD(ch_in_cmpibd)
 
-    in_ch_for_summarize_ibd = ch_raw_ibd
-        .map{d, ibd ->
-            def simlabel = d.label
-            def str = "${d.label}\t${d.src}\t${d.chrno}\t${ibd.toAbsolutePath()}"
-            [simlabel, str]
-        }
-        .groupTuple()
-        .map {simlabel, str_list-> [simlabel, str_list.sort().join('\n')]}
-    in_ch_for_summarize_ibd
-    | SUMMARIZE_IBD
 
-    ///////////////////////////////////////////////
-    // group chromosomes to remove highly related, then convert back to normal
-    // IBD per chromosome
-    if (params.rm_related) {
-        ch_raw_ibd | map {d, ibd ->
-            def grp = "${d.label}:${d.src}"
-            return [groupKey(grp, d.num_chr), [d, ibd]]
-        }  | groupTuple(sort: {item->item[0].chrno} ) 
-           | map {grp, ll -> 
-                def dd = ll.collectEntries{[ it[0].chrno, it[0] ]}
-                def ibd_lst = ll.collect{it[1]}
-                return [dd, ibd_lst] } 
-           | RM_HIGHLY_RELATED
+
+    // ********************** Process ibd ***************************
+    PROC_DIST_NE( ch_out_ibd_grp.combine(ch_sp_sets, by: 0) )
+
+
+
+    // ********************** Run IbdNe ***************************
+    ch_in_ibdne = PROC_DIST_NE.out.ne_input_orig.map{it + [false]}
+        .concat( PROC_DIST_NE.out.ne_input_rmpeaks.map {it + [true]} )
+        // label, ibdcaller, jar, sh, map, ibd, are_peaks_removed
+        .combine( ch_sp_sets, by: 0) // add args
+
+    RUN_IBDNE(ch_in_ibdne)
+
+    emit: 
+
+    ch_ibdcov = PROC_DIST_NE.out.cov_ibd_obj.combine(ch_sp_sets, by: 0) 
+            // label, ibdcaller, ibdobj, args
+    ch_ibdcmp = CMP_TRUE_AND_INFERRED_IBD.out.combine(ch_sp_sets, by: 0) 
+            // label, ibdcaller, ibdcmpobj, args
+    ch_ibdne = RUN_IBDNE.out.combine(ch_sp_sets, by: 0)
+            // label, ibdcaller, are_peaks_removed, ne, args,
         
-        ch_raw_ibd = RM_HIGHLY_RELATED.out
-        | map {dd, ibd_unordered ->
-            ll = ibd_unordered.collect{
-                    [ it.getSimpleName().toInteger(), it] // chrno, ibd
-                }
-                .sort {a, b-> a[0]<=>b[0]} // sort by chrno
-            ll.collect{chrno, ibd -> [dd[chrno], ibd] }
-        } | flatMap
-    }
 
-    ch_ibd_with_proc = ch_raw_ibd
-        .combine(ch_diff_proc) // d, ibd, proc
-        .map {d, ibd, proc -> [ d+ proc, ibd] }
-        .map {d, ibd -> def peaks = []; [d, ibd, peaks] }
+}
 
-    ch_ibd_with_proc
-    | PROC_IBD
+workflow WF_MP {
 
-    ch_ibdne = PROC_IBD.out.proc_ibd.map{d, ibd, gmap -> 
-            [groupKey("${d.label}_${d.proc_label}_${d.src}", d.num_chr), [d, ibd, gmap]]} // use GroupKey to allow groupying without wait for all tasks to be done
-        .groupTuple(by:0, sort: {a, b-> a[0].chrno<=>b[0].chrno})//.view() // sort by chrno
-        .map{label, items -> 
-            def d=items[0][0] + [chrno: 'all', minregion: 10] // only need one param_dict copy
-            return [d, items.collect{it[1]}, items.collect{it[2]}];
-            }//.dump(tag: 'ne_input')
-    CALL_IBDNE(ch_ibdne)
+    main:
 
-    // -------------------------- Summarize Ne results -----------------------------
-    in_ch_summarize_ne = CALL_IBDNE.out.ne
-        .map{d, ne -> def str = "${d.label}\t${d.src}\t${d.proc_label}\t${ne.toAbsolutePath()}"
-            return [d.label, str]}
-        .groupTuple()
-        .map {label, str_list -> [label, str_list.sort().join('\n')]}
+    // *********************** Log params ************************
+    ch_mp_sets = Channel.fromList(mp_sets.collect {label, args->[label, args]})
+    if(params.test) { ch_mp_sets = ch_mp_sets.take(1) }
 
-    in_ch_true_ne = SIMULATE_CHR.out.others
-        // each chr given true_ne but they are redudant and only one is needed
-        .filter{d, slimtree, daf, truene, restart_count ->d.chrno == 1} 
-        .map{d, slimtree, daf, truene, restart_count ->
-            def str = "${d.label}\t${truene.toAbsolutePath()}"
+    Channel.value(['label'] + mp_set_args_keys)
+        .concat( ch_mp_sets.map{k, args -> 
+            [k] + mp_set_args_keys.collect{i -> args[i]} }
+        )
+        .map{lst-> lst.join("\t")}
+        .collectFile(name: "mp_sets.tsv", newLine: true, storeDir: resdir, sort:false)
+        
+
+    // ***********************Simulation *************************
+
+    ch_chrs = Channel.fromList(1..(params.nchroms))
+
+    ch_mp_input = ch_mp_sets
+        .combine( ch_chrs )
+        .map {label, args, chrno -> [label, chrno, args]}
+
+    SIM_MP_CHR(ch_mp_input)
+
+
+    // *********************** Call ibd *************************
+    ch_trees_vcf = SIM_MP_CHR.out.trees_vcf // label, chrno, trees, vcf
+
+    ch_in_ibdcall_trees = ch_trees_vcf
+        .combine(ch_mp_sets, by:0)
+        .map{label, chrno, trees, vcf, args -> [label, chrno, args, trees] }
+
+    ch_in_ibdcall_vcf = ch_trees_vcf
+        .combine(ch_mp_sets, by:0)
+        .map{label, chrno, trees, vcf, args -> [label, chrno, args, vcf] }
+
+    ch_in_ibdcall_vcf_with_ne = ch_in_ibdcall_vcf
+        .map{it + [ [] ] }
+        // label, chrno, args, vcf, true_ne (empty)
+        //
+        //                            ^
+        //                            |
+        // Note pass [] to true_ne, this signals multiple-pop simulation,
+        // a Ne value is caluated from simulation args, see function `mp_ne`
+        // defined above the process definitions
+
+    CALL_IBD_TSINFERIBD(ch_in_ibdcall_vcf_with_ne)
+    CALL_IBD_HAPIBD(ch_in_ibdcall_vcf)
+    CALL_IBD_TSKIBD(ch_in_ibdcall_trees)
+    CALL_IBD_REFINEDIBD(ch_in_ibdcall_vcf)
+    CALL_IBD_TPBWT(ch_in_ibdcall_vcf)
+    CALL_IBD_HMMIBD(ch_in_ibdcall_vcf)
+    CALL_IBD_ISORELATE(ch_in_ibdcall_vcf)
+
+
+    // ********************** Compare ibd ***************************
+    ch_out_ibd_grp = \
+            CALL_IBD_TSINFERIBD.out.ibd.map{it + ["tsinferibd"]}
+        .concat(
+            // parse extra_files and get maxtrmca and append to ibdcaller name
+            CALL_IBD_TSINFERIBD.out.ibd_extra
+                .flatMap{label, chrno, extra_ibd ->
+                    // Note: extra_ibd can be a path or a list of Path
+                    def lst = (extra_ibd instanceof List) ? extra_ibd: [extra_ibd]
+                    lst.collect{ibd ->
+                        def maxtmrca = get_maxtmrca(ibd)
+                        def ibdcaller = "tskinferibd${maxtmrca}"
+                        [label, chrno, ibd, ibdcaller]
+                    }
+            },
+            CALL_IBD_HAPIBD.out.map{it + ["hapibd"]},
+            CALL_IBD_TSKIBD.out.map{it + ["tskibd"]},
+            CALL_IBD_REFINEDIBD.out.map{it+ ["refinedibd"]},
+            CALL_IBD_TPBWT.out.map{it + ["tpbwt"]},
+            CALL_IBD_HMMIBD.out.map{it + ["hmmibd"]},
+            CALL_IBD_ISORELATE.out.map{it+["isorelate"]}
+        )
+        .map{label, chrno, ibd, ibdcaller ->
+            def key =  groupKey([label, ibdcaller], params.nchroms)
+            def data = [chrno, ibd]
+            return [key, data]}
+        .groupTuple(by: 0, sort: {a, b -> a[0] <=> b[0]})
+        .map {key, data_lst ->
+            def label = key[0]
+            def ibdcaller = key[1]
+            def ibd_lst = data_lst.collect{data -> data[1]}
+            return [label, ibdcaller, ibd_lst]
         }
-        .toList()
-        .map {str_list -> str_list.sort().join('\n')}
 
-    SUMMARIZE_NE (in_ch_summarize_ne, in_ch_true_ne)
+
+    ch_trueibd = ch_out_ibd_grp
+        .filter{it[1] == "tskibd"}.map{it-> [it[0], it[2]]} // label, trueibd_list
+
+    ch_in_cmpibd = ch_out_ibd_grp.combine(ch_trueibd, by: 0).combine(ch_mp_sets, by:0)
+    // label, ibdcaller, ibd_lst, trueibd_lst, args
+
+    CMP_TRUE_AND_INFERRED_IBD(ch_in_cmpibd)
+
+
+
+    // ********************** Process ibd ***************************
+
+    PROC_INFOMAP( ch_out_ibd_grp.combine(ch_mp_sets, by: 0) )
+
+
+    // ********************** Run IbdNe ***************************
+    ch_in_run_infomap = PROC_INFOMAP.out.ifm_orig_ibd_obj.map{it + [false]}.concat (
+        PROC_INFOMAP.out.ifm_orig_ibd_obj.map{it + [true]}
+    ).combine(ch_mp_sets, by: 0)
+
+    RUN_INFOMAP(ch_in_run_infomap)
+
+
+
+
+    emit:
+
+    ch_ibdcmp = CMP_TRUE_AND_INFERRED_IBD.out.combine(ch_mp_sets, by: 0) 
+            // label, ibdcaller, ibdcmpobj, args
+    ch_ifm = RUN_INFOMAP.out.combine(ch_mp_sets, by: 0)
+            // label, ibdcaller, are_peaks_removed, member, args,
+
+}
+
+workflow WF_SUMMARY {
+    
 }
 
 workflow {
-    def params_dict = params.simulation_defaults
 
-    // -------------------------------- different selection coefficients ------------------------------
-    ch_different_s = channel.fromList([
-        [s: 0,                  label: 'Neutral'],
-        // [s: 0.2, s_start_g: 80, label: 'selCoeff_0.2_selStartG_80'],
-        [s: 0.4, s_start_g: 50, label: 'selCoeff_0.4_selStartG_50'],
-    ])
-
-    // -------------------------------- different Ne -------------------- ------------------------------
-    ch_desc_ne = channel.fromList([
-        [N0: 100000,    label: 'N0_100000'],
-        // [N0: 30000,     label: 'N0_30000'],
-        [N0: 10000,     label: 'N0_10000'],
-        // [N0: 3000,      label: 'N0_3000'],
-        [N0: 1000,      label: 'N0_1000'],
-    ])
-
-    // -------------------------------- make simulation sets -------------- ------------------------------
-    ch_simu_set = ch_different_s
-        .combine(ch_desc_ne).map {left, right-> 
-            def label_combined  = "${right.label}_${left.label}"
-            return params_dict + left + right + [label: label_combined]
-        }//.view()
-
-    // -------------------------------- inject different ibd processing------ ------------------------------
-    ch_diff_proc = channel.fromList([
-        [ibd_cut_mode: 'nocut',     proc_label: "nocut" ],
-        // [ibd_cut_mode: 'hardcut',   proc_label: "hardcut_s00e50",    cut_start: "0", cut_end: "50000000", minregion: 20 ],
-        // [ibd_cut_mode: 'hardcut',   proc_label: "hardcut_s00e60",    cut_start: "0", cut_end: "60000000", minregion: 20 ],
-        // [ibd_cut_mode: 'hardcut',   proc_label: "hardcut_s00e80",    cut_start: "0", cut_end: "80000000", minregion: 10 ],
-        // [ibd_cut_mode: 'hardcut',   proc_label: "hardcut_s23e43",   cut_start: "23000000" ,cut_end: "43000000", minregion: 20 ],
-        // [ibd_cut_mode: 'hardcut',   proc_label: "hardcut_s13e53",   cut_start: "13000000",cut_end: "53000000", minregion: 20 ],
-        // [ibd_cut_mode: 'hardcut',   proc_label: "hardcut_s03e63",    cut_start:  "3000000", cut_end: "63000000", minregion: 20 ],
-        [ibd_cut_mode: 'autocut',   proc_label: "autocut_hapibd",                                          minregion:20],
-        // [ibd_cut_mode: 'mutcut',    proc_label: "mutcut",                                           minregion:20],
-    ])
-
-    // ---------------------------- for testing, also see params.simulation_defaults --------------------
-    if (params_dict.test) {
-        ch_simu_set = ch_simu_set.take(2)
-    }
-
-    // ----------------------------- expand simulation sets into chromosomes --------------------------------
-    ch_simu_chr = ch_simu_set.flatMap{d-> 
-        (1..(d.num_chr)).collect{ d + [chrno:it] }
-    }
-    
-    // allow $params.num_neutral_chrs chromosomes to be neutral while the rest to be under selection
-    ch_simu_chr = ch_simu_chr.map {d ->
-        if (d.chrno <= params.num_neutral_chrs){
-            d.s = 0
-            d.num_origins = 0
-            d.h = 0
-            d.s_start_g = 0
-        }
-        d
-    }
-
-    // ---------------------------- RUN simulation ancestry ----------------------------------------
-    SIMULATE_CHR(ch_simu_chr)
-
-    // ---------------------------- RUN simulation mutation ----------------------------------------
-    SIMULATE_CHR_MUTATIONS(SIMULATE_CHR.out.trees)
-    ch_sim_mut = SIMULATE_CHR_MUTATIONS.out
-    
-    // -----------------------------RUN tsinfer tsdate ---------------------------------------------
-
-    // tsinfer tsdate input format: tuple val(d), path(vcf), path(ne_df)
-    // combine vcf and ne by simulation label + chrno
-    ch_ne = SIMULATE_CHR.out.others.map{d, tree_fn, daf_fn, ne_fn, restart_count -> 
-        ["${d.label}:${d.chrno}", ne_fn] }    // add key and extract ne item
-    ch_vcf_ne = ch_sim_mut.map{d, vcf -> 
-            ["${d.label}:${d.chrno}",d, vcf]} // add key 
-        .combine(ch_ne, by: 0)                // combine by key
-        .map{tmplabel, d, vcf, ne -> [d, vcf, ne]} // remove tmp key
-    TSINFER_TSDATE_PER_CHR(ch_vcf_ne)
-
-    // ------------------------- Gather trees ------------------------------------------------
-    ch_inferred_tree = TSINFER_TSDATE_PER_CHR.out.map{d, trees -> def d2 = d+['src': 'tsinfer_tree']; [d2, trees]}
-    ch_simulated_tree = SIMULATE_CHR.out.trees.map {d, trees -> def d2 = d + ['src': 'true_tree']; [d2, trees]}
-    ch_all_trees = ch_simulated_tree.concat(ch_inferred_tree)
-
-    // ------------------------- Summarize Trees -----------------------------------------------
-    in_ch_for_summarize_trees = ch_all_trees
-        .map {d, trees -> 
-            def simlabel = d.label
-            def str = "${d.label}\t${d.src}\t${d.chrno}\t${trees.toAbsolutePath()}"
-            return [groupKey(simlabel, d.num_chr), str]
-        }
-        .groupTuple()
-        .map {simlabel, str_list-> [simlabel, str_list.sort().join('\n')]}
-    
-    SUMMARIZE_TREES(in_ch_for_summarize_trees)
-
-    // ------------------------- -- Run tskibd --------------------------------------------------
-    CALC_RAW_IBD(ch_all_trees)
-
-    // ---------------------------- call ibd --------------------------------------------------
-    // NOTE: the original general process CALL_IBD was split into multiple
-    // So that each process can have separate conda configuration
-    ch_in_4_ibd_calling = ch_sim_mut.multiMap{d, vcf-> 
-        hapibd: [ ['src': 'hapibd', 'ibdcaller': 'hapibd'] + d, vcf ]
-        refinedibd: [ ['src': 'refinedibd', 'ibdcaller': 'refinedibd'] + d, vcf ]
-        tpbwt: [ ['src': 'tpbwt', 'ibdcaller': 'tpbwt'] + d, vcf ]
-        hmmibd: [ ['src': 'hmmibd', 'ibdcaller': 'hmmibd'] + d, vcf ]
-        isorelate: [ ['src': 'isorelate', 'ibdcaller': 'isorelate'] + d, vcf ]
-    }
-
-    ch_in_4_ibd_calling.hapibd | CALL_IBD_HAPIBD
-    ch_in_4_ibd_calling.refinedibd | CALL_IBD_REFINEDIBD
-    ch_in_4_ibd_calling.tpbwt | CALL_IBD_TPBWT
-    ch_in_4_ibd_calling.hmmibd | CALL_IBD_HMMIBD
-    ch_in_4_ibd_calling.isorelate | CALL_IBD_ISORELATE
-
-
-    // mix IBD from snp-based ibdcallers
-    ch_call_ibd_out = CALL_IBD_HAPIBD.out.raw_ibd.concat(
-        CALL_IBD_REFINEDIBD.out.raw_ibd, 
-        CALL_IBD_TPBWT.out.raw_ibd,
-        CALL_IBD_HMMIBD.out.raw_ibd,
-        CALL_IBD_ISORELATE.out.raw_ibd
-    )
-
-    // --------------------------- directly compare raw ibd ----------------------------------------
-    // Format tuple val(d_infer), path(ibd_infer), path(ibd_true)
-    ch_true_raw_ibd = CALC_RAW_IBD.out.raw_ibd.filter {d, ibd-> d.src == 'true_tree'}
-    ch_infer_raw_ibd = CALC_RAW_IBD.out.raw_ibd.filter {d, ibd-> d.src != 'true_tree'}
-        .concat (ch_call_ibd_out)
-    ch_true_infer_raw_ibd = 
-            ch_true_raw_ibd .map{d, ibd -> def sim_chr_label = "${d.label}_${d.chrno}"; [sim_chr_label, ibd]}
-        .combine(
-            ch_infer_raw_ibd.map{d, ibd -> def sim_chr_label = "${d.label}_${d.chrno}"; [sim_chr_label, d, ibd]},
-            by: 0
-        )
-        .map {sim_chr_label,  ibd_true, d_infer, ibd_infer -> 
-            def sim_src_label = "${d_infer.label}_${d_infer.src}"
-            [sim_src_label, [d_infer.chrno, d_infer, ibd_infer, ibd_true] ]}
-        .groupTuple(sort: {a, b -> a[0] <=> b[0]})
-        .map {sim_src_label, ll ->
-            def d_infer_new = ll[0][1] + ['chrno': 'all']
-            def ibd_infer = ll.collect{it[2]}
-            def ibd_true = ll.collect{it[3]}
-            return [d_infer_new, ibd_infer, ibd_true]
-        }
-        .flatMap{ d, ibd_infer, ibd_true ->
-            if (d.src == 'tsinfer_tree')
-                return [
-                    [d + [src: 'tsinfer_tree_0_1000', min_tmrca: 0, max_tmrca: 1000], ibd_infer, ibd_true],
-                    [d + [src: 'tsinfer_tree_0_3000', min_tmrca: 0, max_tmrca: 3000], ibd_infer, ibd_true],
-                    [d + [src: 'tsinfer_tree_0_10000', min_tmrca: 0, max_tmrca: 10000], ibd_infer, ibd_true],
-                ]
-            else 
-                return [
-                    [d, ibd_infer, ibd_true]
-                ]
-        }
-
-    CMP_TRUE_AND_INFERRED_RAW_IBD(ch_true_infer_raw_ibd)
-
-
-    // --------------------------- Gather all IBD ---------------------------------------
-    ch_combined_all_ibd = CALC_RAW_IBD.out.raw_ibd
-        .concat(ch_call_ibd_out) // first concat IBD all of all sources: simulated tree, inferred tree, seq-based
-
-    // ---------------------------- Summarize IBD ----------------------------------
-    in_ch_for_summarize_ibd = ch_combined_all_ibd
-        .map{d, ibd ->
-            def simlabel = d.label
-            def str = "${d.label}\t${d.src}\t${d.chrno}\t${ibd.toAbsolutePath()}"
-            [simlabel, str]
-        }
-        .groupTuple()
-        .map {simlabel, str_list-> [simlabel, str_list.sort().join('\n')]}
-    SUMMARIZE_IBD(in_ch_for_summarize_ibd)
-
-    // ---------------------------- Process raw IBD ----------------------------------
-    ch_ibd_with_proc = ch_combined_all_ibd
-        .combine(ch_diff_proc) // iterate for different proc methods
-        .map{d, ibd, proc-> [d + proc, ibd]}
-        .map{d, ibd-> [d.src, d, ibd] }
-    
-    ch_tsinfer_ibd_cutoff = channel.fromList([
-        // ['tsinfer_tree', 100],
-        // ['tsinfer_tree', 300],
-        ['tsinfer_tree', 1000],
-        ['tsinfer_tree', 3000],
-        ['tsinfer_tree', 10000],
-        ['true_tree', 'None' ],
-        ['hapibd', 'None' ],
-        ['refinedibd', 'None' ],
-        ['tpbwt', 'None' ],
-        ['hmmibd', 'None' ],
-        ['isorelate', 'None' ],
-    ])
-
-    CALL_IBD_HAPIBD.out.raw_ibd | FIND_PEAKS
-    ch_peaks = FIND_PEAKS.out.ibd_peaks.map{d, peaks -> def grp="${d.label}_${d.chrno}"; [grp,  peaks]}
-
-    in_ch_proc_ibd = ch_ibd_with_proc
-        .combine(ch_tsinfer_ibd_cutoff, by: 0)
-        .map {src, d, ibd, cutoff ->
-            def grp = "${d.label}_${d.chrno}"
-            def d2 = d.clone()
-            if (cutoff != 'None') {
-                d2.src = "${d.src}_upto_n" + String.format("%05d", cutoff)
-                d2 = d2+ ['ibd_tmrca_cutoff': cutoff]
-            }
-            return [grp, d2, ibd]
-        }
-        .combine(ch_peaks, by: 0)
-        .map {grp, d, ibd, peaks -> [d, ibd, peaks]}
-        // .view{[it[0].src, it[0].ibd_tmrca_cutoff]}
-
-    PROC_IBD(in_ch_proc_ibd)
-    
-    //  ---------------------------- Run IBDNe ------------------------------------
-    ch_ibdne = PROC_IBD.out.proc_ibd.map{d, ibd, gmap -> 
-            [groupKey("${d.label}_${d.proc_label}_${d.src}", d.num_chr), [d, ibd, gmap]]} // use GroupKey to allow groupying without wait for all tasks to be done
-        .groupTuple(by:0, sort: {a, b-> a[0].chrno<=>b[0].chrno})//.view() // sort by chrno
-        .map{label, items -> 
-            def d=items[0][0] + [chrno: 'all', minregion: 10] // only need one param_dict copy
-            return [d, items.collect{it[1]}, items.collect{it[2]}];
-            }//.view()
-    CALL_IBDNE(ch_ibdne)
-
-
-    // -------------------------- Summarize Ne results -----------------------------
-    in_ch_summarize_ne = CALL_IBDNE.out.ne
-        .map{d, ne -> 
-            def str = "${d.label}\t${d.src}\t${d.proc_label}\t${ne.toAbsolutePath()}"
-            return [d.label, str]}
-        .groupTuple()
-        .map {label, str_list -> [label, str_list.sort().join('\n')]}
-
-    in_ch_true_ne = SIMULATE_CHR.out.others
-        // each chr given true_ne but they are redudant and only one is needed
-        .filter{d, slimtree, daf, truene, restart_count ->d.chrno == 1} 
-        .map{d, slimtree, daf, truene, restart_count ->
-            def str = "${d.label}\t${truene.toAbsolutePath()}"
-        }
-        .toList()
-        .map {str_list -> str_list.sort().join('\n')}
-
-    SUMMARIZE_NE (in_ch_summarize_ne, in_ch_true_ne)
+    WF_SP()
+    WF_MP()
 }

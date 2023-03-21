@@ -271,8 +271,11 @@ def write_peudo_homozygous_vcf(ts_mutated, chrno, out_vcf):
         if len(v.alleles) != 2:
             continue
         gt_list.append(v.genotypes)
-        ref_list.append(v.alleles[0])
-        alt_list.append(v.alleles[1])
+        i = int(v.alleles[1])
+        a = "ATGC"[i % 4]
+        r = "ATGC"[(i + 1) % 4]
+        ref_list.append(r)
+        alt_list.append(a)
         pos_list.append(int(v.position))
 
     # prep header

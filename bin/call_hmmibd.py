@@ -9,20 +9,25 @@ import argparse
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--vcf", type=str, required=True)
-    parser.add_argument("--bp_per_cm", type=int, required=True)
+    help = (
+        "Note: bp_per_cm is not respected by hmmIBD. Recombination rate is"
+        "hard-coded in hmmIBD.c source code"
+    )
+    parser.add_argument("--r", type=float, required=True, help=help)
+    parser.add_argument("--seqlen", type=int, required=True)
     parser.add_argument("--n", type=int, default=100)
     parser.add_argument("--m", type=int, default=5)
-    parser.add_argument("--seqlen_in_cm", type=int, required=True)
     parser.add_argument("--chrno", type=int, required=True)
     parser.add_argument("--mincm", type=float, default=2.0)
+    parser.add_argument("--genome_set_id", type=int, required=True)
 
     return parser.parse_args()
 
 
 args = get_args()
 vcf = args.vcf
-bp_per_cm = args.bp_per_cm
-seqlen_in_cm = args.seqlen_in_cm
+bp_per_cm = 0.01 / args.r
+seqlen_in_cm = args.seqlen / bp_per_cm
 chrno = args.chrno
 n = args.n
 m = args.m
@@ -68,7 +73,16 @@ df_ibd["HasMutation"] = 0
 
 sel_cols = ["Id1", "Id2", "Start", "End", "Ancestor", "Tmrca", "HasMutation"]
 sel_rows = ((df_ibd.End - df_ibd.Start) / bp_per_cm) >= mincm
-df_ibd.loc[sel_rows, sel_cols].to_csv(f"{chrno}.ibd", sep="\t", index=None)
+
+ofn = f"{args.genome_set_id}_{chrno}_hmmibd.ibd"
+df_ibd.loc[sel_rows, sel_cols].to_csv(ofn, sep="\t", index=None)
 
 # -------------------- write log (just for consistency with other ibd callers) -
 Path(f"{chrno}.log").write_text(cmd)
+
+print(
+    f"""
+    output: 
+        {ofn}
+     """
+)

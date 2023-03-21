@@ -1,20 +1,14 @@
 #! /usr/bin/env python3
 import argparse
-from pathlib import Path
 import sys
-import tskit
 import tsinfer
 import tsdate
 import msprime
 import pandas as pd
 import numpy as np
 import allel
-import gzip
-from typing import Tuple, List
 import io
-import msprime
-import sys
-
+from typing import Tuple
 
 parser = argparse.ArgumentParser(
     """
@@ -26,29 +20,22 @@ parser = argparse.ArgumentParser(
     """
 )
 parser.add_argument("--vcf_files", nargs="+", type=str, required=True)
-parser.add_argument("--in_bp_per_cm", type=int, required=True)
+parser.add_argument("--r", type=float, required=True)
+parser.add_argument("--u", type=float, required=True)
 parser.add_argument(
     "--ne", type=str, required=True, help="interger or file name to true_ne table"
 )
 
-if sys.argv[0] != "":  # non-interactive mode
-    args = parser.parse_args()
-else:
-    # args = parser.parse_args(
-    #     "--vcf_files 1.vcf.gz 2.vcf.gz 3.vcf.gz --in_bp_per_cm 15000".split(" ")
-    # )
-    args = parser.parse_args(
-        "--vcf_files 1.vcf.gz --in_bp_per_cm 15000 --ne tmp.ne.tsv".split(" ")
-    )
-
+args = parser.parse_args()
 print(args)
-bp_per_cm = args.in_bp_per_cm
+bp_per_cm = int(0.01 / args.r)
 vcf_files = args.vcf_files
 input_ne = args.ne
 
 if input_ne.isnumeric():
     input_ne = int(input_ne)
 else:
+    # TODO: check true_ne table format for simulation code
     # Format: col1: generation, col2: Ne
     df_true_ne = pd.read_csv(input_ne, sep="\t")
     assert len(df_true_ne.columns) == 2
@@ -66,6 +53,7 @@ def read_vcf_files_into_df(vcf_files) -> Tuple[pd.DataFrame, pd.Series]:
     Samples = None
     for vcf in vcf_files:
         calldata = allel.read_vcf(vcf, alt_number=1)
+        # assume vcf samples are haploid or pseudo homozygous diploid
         gt.append(calldata["calldata/GT"][:, :, 0])
         chrom.append(calldata["variants/CHROM"])
         pos.append(calldata["variants/POS"])
@@ -78,6 +66,8 @@ def read_vcf_files_into_df(vcf_files) -> Tuple[pd.DataFrame, pd.Series]:
                 if line.startswith("##contig")
             ]
         )
+        # If multiple vcf files are present, check sample names
+        # are in the same order across these vcf files.
         if Samples is None:
             Samples = calldata["samples"]
         else:
@@ -183,7 +173,9 @@ ts.dump(f"tmp_genome_wide.trees")
 
 
 # --------- run tsdate ---------------------------------
-ts_dated = tsdate.date(ts.simplify(keep_unary=False), Ne=input_ne)  # <============
+ts_dated = tsdate.date(
+    ts.simplify(keep_unary=False), Ne=input_ne, mutation_rate=args.u
+)  # <============
 ts_dated.dump("tmp.genome_wide_dated.trees")
 
 # my tskibd.cpp do special thing when there is mutation information
