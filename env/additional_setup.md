@@ -1,10 +1,8 @@
 ## Setup `isorelate`
 
 1. Activate the Conda environment: 
-	`conda activate simulation`
-2. Prep Conda environment for compilation: 
-	`mamba install r-devtools`
-3. install `isorelate` in R (select none for updates). Note a commit hash is
+	`conda activate bmibdcaller_simulations`
+2. install `isorelate` in R (select none for updates). Note a commit hash is
    used to control the version of `isorelate`. Within an R session of
    `simulation` environment, run:
 	```
@@ -16,17 +14,15 @@
 ## setup `hmmIBD`
 1. Activate the simulation environment and change directory: 
 	```
-	conda activate simulation
+	conda activate bmibdcaller_simulations
 	cd $CONDA_PREFIX
 	```
 2. Compile and install:
 	```
-	git clone https://github.com/glipsnort/hmmIBD.git
-	cd hmmIBD/
-	git checkout v2.0.4
-	sed -e 's/const double rec_rate = 7.4e-7/const double rec_rate = 6.667e-7/' -i hmmIBD.c
-	$CXX -o hmmIBD -O3 -lm -Wall hmmIBD.c -fpermissive
-	mv hmmIBD $CONDA_PREFIX/bin
+	git clone git@github.com:bguo068/hmmibd-rs.git
+	cd hmmibd-rs/
+	$CXX -o hmmIBDr -O3 -lm -Wall hmmIBD.c -fpermissive
+	mv hmmIBDr $CONDA_PREFIX/bin
 	cd ..
 	rm -rf hmmIBD
 	```
@@ -35,10 +31,11 @@
 
 1. Activate the simulation environment and change directory: 
 	```
-	conda activate simulation
+	conda activate bmibdcaller_simulations
 	cd $CONDA_PREFIX
 	```
-2. The `prep Conda environment for compilation` step is covered in Conda environment recipe
+2. In case, the following packages is not included in the environment
+`bmibdcaller_simulations`, run:
 	`mamba install cython pandas numpy setuptools_scm`
 3. git clone and install `phasedibd` into the Conda environment
 
@@ -51,3 +48,16 @@
 	cd ..
 	rm -rf phasedibd
 	```
+
+## setup tskibd
+```
+	conda activate bmibdcaller_simulations
+	git clone git@github.com:gbinux/tskibd.git
+	cd tskibd
+	git submodule update --init --recursive
+	meson build
+	ninja -C build tskibd
+	cp  build/tskibd $CONDA_PREFIX/bin/
+	cd ..
+	rm -rf tskibd
+```

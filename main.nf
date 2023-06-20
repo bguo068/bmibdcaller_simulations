@@ -42,6 +42,12 @@ params.resdir = "res"
 
 params.meta = "" // empty for simulation
 
+// helper function to split string with ','
+def to_lst(value){
+    def lst = "${value}".split(",").collect{it};
+    return lst
+}
+
 def resdir = params.resdir
 
 def sp_defaults = [
@@ -107,6 +113,13 @@ def sp_sets = [
     sp_o03: sp_defaults + [num_origins: 3, genome_set_id: 10008],
     sp_o27: sp_defaults + [num_origins: 27, genome_set_id: 10009],
     sp_rel: sp_defaults + [sim_relatedness: 1, genome_set_id: 30000],
+    sp_r0003: sp_defaults + [r: 3e-9, genome_set_id: 40001],
+    sp_r0010: sp_defaults + [r: 1e-8, genome_set_id: 40002],
+    sp_r0030: sp_defaults + [r: 3e-8, genome_set_id: 40003],
+    sp_r0100: sp_defaults + [r: 1e-7, genome_set_id: 40004],
+    sp_r0300: sp_defaults + [r: 3e-7, genome_set_id: 40005],
+    sp_r0667: sp_defaults + [r: 6.667e-7, genome_set_id: 40006],
+    sp_r1000: sp_defaults + [r: 1e-6, genome_set_id: 40007],
 ]
 
 def mp_sets = [
@@ -115,6 +128,13 @@ def mp_sets = [
     mp_s02: mp_defaults + [s:0.2, genome_set_id: 20002],
     mp_s03: mp_defaults + [s:0.3, genome_set_id: 20003],
     mp_rel: mp_defaults + [sim_relatedness: 1, genome_set_id: 30001],
+    mp_r0003: mp_defaults + [r: 3e-9, genome_set_id: 50001],
+    mp_r0010: mp_defaults + [r: 1e-8, genome_set_id: 50002],
+    mp_r0030: mp_defaults + [r: 3e-8, genome_set_id: 50003],
+    mp_r0100: mp_defaults + [r: 1e-7, genome_set_id: 50004],
+    mp_r0300: mp_defaults + [r: 3e-7, genome_set_id: 50005],
+    mp_r0667: mp_defaults + [r: 6.667e-7, genome_set_id: 50006],
+    mp_r1000: mp_defaults + [r: 1e-6, genome_set_id: 50007],
 ]
 
 def sp_set_args_keys = sp_sets.collect{k, v -> v}[0].collect{k, v->k}

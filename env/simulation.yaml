@@ -1,4 +1,4 @@
-name: simulation
+name: bmibdcaller_simulations
 channels:
   - conda-forge
   - bioconda
@@ -34,10 +34,12 @@ dependencies:
   - plink=1.90b6.21       # used in prep input for isorelate
   - cython=0.29.32        # required by TPBWT
   - setuptools_scm=7.0.5  # required by TPBWT
-  - r-base=4.1.3          # required by isoRelate
-  - r-devtools=2.4.4      # required by isoRelate
+  - r-base=4.2.2          # required by isoRelate
+  - r-devtools=2.4.5      # required by isoRelate
   - pip:
     - tsdate==0.1.5
+    - ibdutils @ git+ssh://git@github.com/bguo068/ibdutils
+
 
   # NOTE: after install this conda environment, follow `./additional_setup.md`
   # for instruction to install isoRelate, hmmIBD and phasedIBD packages
