@@ -46,7 +46,7 @@ with open(f"{chrno}.map", "w") as f:
 # ------------------- call hapibd ----------------------------------
 map_fn = f"{chrno}.map"
 cmd = (
-    f"java -Xmx{mem_gb}g -jar {refinedibd_jar} gt={vcf} map={map_fn}"
+    f"java -Xss5M -Xmx{mem_gb}g -jar {refinedibd_jar} gt={vcf} map={map_fn}"
     f" nthreads={nthreads} out={chrno} chrom={chrno}"
     f" lod={lod} scale={scale} length={length}"
 )
