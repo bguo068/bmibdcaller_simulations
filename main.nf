@@ -999,6 +999,7 @@ workflow OPTIMIZE_HAPIBD {
     SIM_SP_CHR(ch_sp_input)
     SIM_MP_CHR(ch_mp_input)
 
+
     // prepare ibdcaller input
     ch_trees_vcf = SIM_SP_CHR.out.trees_vcf.concat(SIM_MP_CHR.out.trees_vcf) // label, chrno, trees, vcf
 
@@ -1043,11 +1044,11 @@ workflow OPTIMIZE_HAPIBD {
     }
 
     ch_in_ibdcall_trees = ch_trees_vcf
-        .combine(ch_sp_sets, by:0)
+        .combine(ch_sp_sets.concat(ch_mp_sets), by:0)
         .map{label, chrno, trees, vcf, args -> [label, chrno, args, trees] }
 
     ch_in_ibdcall_vcf = ch_trees_vcf
-        .combine(ch_sp_sets, by:0)
+        .combine(ch_sp_sets.concat(ch_mp_sets), by:0)
         .map{label, chrno, trees, vcf, args -> [label, chrno, args, vcf] }
     
     ch_in_ibdcall_vcf_with_params = ch_in_ibdcall_vcf 
