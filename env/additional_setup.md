@@ -2,7 +2,9 @@
 
 1. Activate the Conda environment: 
 	`conda activate bmibdcaller_simulations`
-2. install `isorelate` in R (select none for updates). Note a commit hash is
+2. Prep Conda environment for compilation: 
+	`mamba install r-devtools`
+3. install `isorelate` in R (select none for updates). Note a commit hash is
    used to control the version of `isorelate`. Within an R session of
    `simulation` environment, run:
 	```
@@ -18,6 +20,7 @@
 	cd $CONDA_PREFIX
 	```
 2. Compile and install:
+   - for `hmmIBD` c version
 	```
 	git clone git@github.com:bguo068/hmmibd-rs.git
 	cd hmmibd-rs/
@@ -25,6 +28,15 @@
 	mv hmmIBDr $CONDA_PREFIX/bin
 	cd ..
 	rm -rf hmmIBD
+	```
+	- for 'hmmibd2' (this rust version)
+	```
+	git clone git@github.com:bguo068/hmmibd-rs.git
+	cd hmmibd-rs/
+	cargo build --release --bin hmmibd2
+	cp target/release/hmmibd2  $CONDA_PREFIX/bin
+	cd ..
+		
 	```
 
 ## setup TPBWT

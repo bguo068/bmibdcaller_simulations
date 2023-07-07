@@ -57,7 +57,8 @@ df_hmm_inputs = pd.concat([df_pos, df_gt], axis=1)
 df_hmm_inputs.to_csv("hmm_inputs.txt", sep="\t", index=None)
 
 # ------------------- run hmmibd  ----------------------------
-cmd = f"hmmIBDr -i hmm_inputs.txt -o hmmibd_out -n {n} -m {m} -r {args.r}"
+# cmd = f"hmmIBDr -i hmm_inputs.txt -o hmmibd_out -n {n} -m {m} -r {args.r}"
+cmd = f"hmmibd2 -i hmm_inputs.txt -o hmmibd_out -n {n} -m {m} -r {args.r}"
 run(cmd, shell=True)
 
 
