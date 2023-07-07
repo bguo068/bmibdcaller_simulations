@@ -123,7 +123,7 @@ def sp_sets = [
 ]
 
 def mp_sets = [
-    // mp_s00: mp_defaults + [s:0.0, genome_set_id: 20000],
+    mp_s00: mp_defaults + [s:0.0, genome_set_id: 20000],
     // mp_s01: mp_defaults + [s:0.1, genome_set_id: 20001],
     // mp_s02: mp_defaults + [s:0.2, genome_set_id: 20002],
     // mp_s03: mp_defaults + [s:0.3, genome_set_id: 20003],
@@ -851,11 +851,11 @@ workflow WF_MP {
         // a Ne value is caluated from simulation args, see function `mp_ne`
         // defined above the process definitions
 
-    CALL_IBD_TSINFERIBD(ch_in_ibdcall_vcf_with_ne)
+    // CALL_IBD_TSINFERIBD(ch_in_ibdcall_vcf_with_ne)
     CALL_IBD_HAPIBD(ch_in_ibdcall_vcf)
     CALL_IBD_TSKIBD(ch_in_ibdcall_trees)
     CALL_IBD_REFINEDIBD(ch_in_ibdcall_vcf)
-    CALL_IBD_TPBWT(ch_in_ibdcall_vcf)
+    // CALL_IBD_TPBWT(ch_in_ibdcall_vcf)
     CALL_IBD_HMMIBD(ch_in_ibdcall_vcf)
     // CALL_IBD_ISORELATE(ch_in_ibdcall_vcf)
 
@@ -936,7 +936,7 @@ workflow WF_SUMMARY {
 workflow {
 
     WF_SP()
-    // WF_MP()
+    WF_MP()
 }
 
 
@@ -979,6 +979,10 @@ workflow OPTIMIZE_HAPIBD {
     ch_sp_sets = Channel.fromList(sp_sets.collect {label, args->[label, args]})
     .filter{label, args -> label == 'sp_neu'}
 
+    ch_mp_sets = Channel.fromList(mp_sets.collect {label, args->[label, args]})
+    .filter{label, args -> label == 'mp_s00'}
+
+
     // combine with chrnos 
     ch_chrs = Channel.fromList(1..(params.nchroms))
 
@@ -987,34 +991,47 @@ workflow OPTIMIZE_HAPIBD {
         .combine( ch_chrs )
         .map {label, args, chrno -> [label, chrno, args]}
 
+    ch_mp_input = ch_mp_sets // label, dict (args)
+        .combine( ch_chrs )
+        .map {label, args, chrno -> [label, chrno, args]}
+
     // run simulations
     SIM_SP_CHR(ch_sp_input)
+    SIM_MP_CHR(ch_mp_input)
 
     // prepare ibdcaller input
-    ch_trees_vcf = SIM_SP_CHR.out.trees_vcf // label, chrno, trees, vcf
+    ch_trees_vcf = SIM_SP_CHR.out.trees_vcf.concat(SIM_MP_CHR.out.trees_vcf) // label, chrno, trees, vcf
 
     // 
     ch_hapibd_args = Channel.fromList([
         [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers: 100],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  90],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  80],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  70],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  60],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  50],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  40],
         [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  30],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  10],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:   3],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers: 100],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  30],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  10],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:   3],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers: 100],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  30],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  10],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:   3],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers: 100],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  30],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  10],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:   3],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers: 100],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  30],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  10],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:   3],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers: 100],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  30],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  10],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:   3],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers: 100],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  30],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  10],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:   3],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers: 100],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  30],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  10],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:   3],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers: 100],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  30],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  10],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:   3],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers: 100],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  30],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  10],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:   3],
     ]).map{args->
         def arg_sp_dir = String.format("ms%d_mo%d_me%d_mg%04d_mm%03d", 
             args.minseed, args.minoutput, args.minextend, args.maxgap, args.minmarkers
