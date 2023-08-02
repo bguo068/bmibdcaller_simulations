@@ -939,6 +939,47 @@ workflow {
     WF_MP()
 }
 
+// Following demographic model used in the hap-ibd paper
+process SIM_UK_CHR {
+    tag "${args.genome_set_id}_${chrno}"
+
+    publishDir "${resdir}/${args.genome_set_id}_${label}/trees/", \
+        pattern: "*.trees", mode: "symlink"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/vcf/", \
+        pattern: "*.vcf.gz", mode: "symlink"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/daf/", \
+        pattern: "*.daf", mode: "symlink"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/restart_count/", \
+        pattern: "*.restart_count", mode: "symlink"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/true_ne/", \
+        pattern: "*.true_ne", mode: "symlink"
+
+    input:
+    tuple val(label), val(chrno), val(args)
+
+    output:
+    tuple val(label), val(chrno), path("*.trees"), path("*.vcf.gz"), \
+        emit: trees_vcf
+    tuple val(label), val(chrno), path("*.daf"), emit: daf
+    tuple val(label), val(chrno), path("*.restart_count"), \
+        emit: restart_count
+    tuple val(label), val(chrno), path("*.true_ne"), emit: true_ne
+
+    script:
+    // subset arguments as not all keys will be used.
+    def cmd_options = (args + [chrno: chrno])\
+        .findAll{k, v -> k in ["chrno", "seqlen","gc", "r", "u", "nsam", "genome_set_id"]}\
+        .collect{k, v-> "--${k} ${v}"}.join(" ")
+    """
+    sim_uk_pop.py $cmd_options
+    mkdir tmp; mv tmp_* tmp/
+    """
+    stub:
+    def prefix="${args.genome_set_id}_${chrno}"
+    """
+    touch ${prefix}{.trees,.vcf.gz,.daf,.restart_count,.true_ne}
+    """
+}
 
 
 process CALL_IBD_HAPIBD_PARAM {
@@ -968,7 +1009,6 @@ process CALL_IBD_HAPIBD_PARAM {
     """
     call_hapibd.py $cmd_options
     """
-
     stub:
     def ibd_dir = String.format("%d", hapibd_args.minseed)
     """touch ${args.genome_set_id}_${chrno}_hapibd.ibd"""
@@ -981,6 +1021,12 @@ workflow OPTIMIZE_HAPIBD {
 
     ch_mp_sets = Channel.fromList(mp_sets.collect {label, args->[label, args]})
     .filter{label, args -> label == 'mp_s00'}
+
+    ch_uk_sets = Channel.fromList( [
+        // all demographic parameters are hard-coded in the slim script
+        ["uk_gc0", [seqlen: 60_000_000, gc:0, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60001]],
+        ["uk_gc1", [seqlen: 60_000_000, gc:1, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60002]],
+    ])
 
 
     // combine with chrnos 
@@ -995,44 +1041,51 @@ workflow OPTIMIZE_HAPIBD {
         .combine( ch_chrs )
         .map {label, args, chrno -> [label, chrno, args]}
 
+    ch_uk_input = ch_uk_sets // label, dict (args)
+        .combine( ch_chrs )
+        .map {label, args, chrno -> [label, chrno, args]}
+
     // run simulations
     SIM_SP_CHR(ch_sp_input)
     SIM_MP_CHR(ch_mp_input)
-
+    SIM_UK_CHR(ch_uk_input)
 
     // prepare ibdcaller input
-    ch_trees_vcf = SIM_SP_CHR.out.trees_vcf.concat(SIM_MP_CHR.out.trees_vcf) // label, chrno, trees, vcf
+    ch_trees_vcf = SIM_SP_CHR.out.trees_vcf
+        .concat(SIM_MP_CHR.out.trees_vcf) // label, chrno, trees, vcf
+        .concat(SIM_UK_CHR.out.trees_vcf) // label, chrno, trees, vcf
 
     // 
     ch_hapibd_args = Channel.fromList([
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers: 100],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  90],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  80],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  70],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  60],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  50],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  40],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  30],
         // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers: 100],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  90],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  80],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  70],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  60],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  50],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  40],
         // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  30],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  10],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:   3],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers: 100],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  30],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  10],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:   3],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers: 100],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  30],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  10],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:   3],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers: 100],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  30],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  10],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:   3],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers: 100],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  30],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  10],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:   3],
+
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers: 100],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  30],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  10],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:   3],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers: 100],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  30],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  10],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:   3],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers: 100],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  30],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  10],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:   3],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers: 100],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  30],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  10],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:   3],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers: 100],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  30],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  10],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:   3],
     ]).map{args->
         def arg_sp_dir = String.format("ms%d_mo%d_me%d_mg%04d_mm%03d", 
             args.minseed, args.minoutput, args.minextend, args.maxgap, args.minmarkers
@@ -1044,11 +1097,11 @@ workflow OPTIMIZE_HAPIBD {
     }
 
     ch_in_ibdcall_trees = ch_trees_vcf
-        .combine(ch_sp_sets.concat(ch_mp_sets), by:0)
+        .combine(ch_sp_sets.concat(ch_mp_sets).concat(ch_uk_sets), by:0)
         .map{label, chrno, trees, vcf, args -> [label, chrno, args, trees] }
 
     ch_in_ibdcall_vcf = ch_trees_vcf
-        .combine(ch_sp_sets.concat(ch_mp_sets), by:0)
+        .combine(ch_sp_sets.concat(ch_mp_sets).concat(ch_uk_sets), by:0)
         .map{label, chrno, trees, vcf, args -> [label, chrno, args, vcf] }
     
     ch_in_ibdcall_vcf_with_params = ch_in_ibdcall_vcf 

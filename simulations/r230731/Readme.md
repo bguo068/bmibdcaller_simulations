@@ -2,6 +2,8 @@
 
 1. Are optimized parameters demographic model-specific? Would parameters
 optimized for single pop module be different from those for multiple pop model.
+    - What are the NP/FP rate if we the simulation model from hap-ibd paper?
+    - url: https://www.sciencedirect.com/science/article/pii/S0002929720300525
 2. What parameters should be optimized for each of the to-be-compared IBD
 callers, including hmmibd, refined-ibd, isoRelate, and tpbwt.
     - for hmmibd
