@@ -8,8 +8,15 @@ optimized for single pop module be different from those for multiple pop model.
 ```
 1. With uk populiaton model and human evolutionary parameters, hapibd has good quality
 2. With single/multiple population model, hapidbd results highly depend on minmarker parameter
-3. maf > 0.1 generate worse results than maf>0.01
+3. maf > 0.1 generate worse results than maf>0.01 
+    - maf >= 0.001 (a.k.a no filter) can generate worse result, for instance (data not included in git)
+    in the multiple population model 
 4. gene conversion versus recombination only does not change the results much (in uk human model)
+5. for pf single/mutiple model, minmarker = 70 or 80 seems to the best parameter.
+
+NOTE:
+"./r_opt_hapibd" supports points 1/2/3/4
+"./r_opt_hapibd_finetune_minmarker" supports point 5
 ```
 
 2. What parameters should be optimized for each of the to-be-compared IBD
