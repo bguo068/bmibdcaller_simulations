@@ -21,6 +21,7 @@ parser.add_argument("--minoutput", type=float, default=2.0)
 parser.add_argument("--maxgap", type=int, default=1000)
 parser.add_argument("--minextend", type=float, default=1.0)
 parser.add_argument("--minmarkers", type=int, default=100)
+parser.add_argument("--minmac", type=int, default=2)
 parser.add_argument("--mem_gb", type=int, required=True)
 parser.add_argument("--nthreads", type=int, default=None)
 parser.add_argument("--genome_set_id", type=int, required=True)
@@ -45,6 +46,7 @@ minoutput = args.minoutput
 maxgap = args.maxgap
 minextend = args.minextend
 minmarkers = args.minmarkers
+minmac = args.minmac
 
 # ------------------- make genetic map ----------------------------
 with open(f"{chrno}.map", "w") as f:
@@ -61,7 +63,7 @@ cmd = (
     f"java -Xmx{mem_gb}g -jar {hapibd_jar} gt={vcf}"
     f" map={map_fn} {threads_opts} out={chrno}"
     f" min-seed={minseed} min-output={minoutput} max-gap={maxgap}"
-    f" min-extend={minextend} min-markers={minmarkers}"
+    f" min-extend={minextend} min-markers={minmarkers} min-mac={minmac}"
 )
 print(cmd)
 res = subprocess.run(cmd.split(), text=True, capture_output=True)

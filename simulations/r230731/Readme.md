@@ -4,6 +4,14 @@
 optimized for single pop module be different from those for multiple pop model.
     - What are the NP/FP rate if we the simulation model from hap-ibd paper?
     - url: https://www.sciencedirect.com/science/article/pii/S0002929720300525
+
+```
+1. With uk populiaton model and human evolutionary parameters, hapibd has good quality
+2. With single/multiple population model, hapidbd results highly depend on minmarker parameter
+3. maf > 0.1 generate worse results than maf>0.01
+4. gene conversion versus recombination only does not change the results much (in uk human model)
+```
+
 2. What parameters should be optimized for each of the to-be-compared IBD
 callers, including hmmibd, refined-ibd, isoRelate, and tpbwt.
     - for hmmibd
