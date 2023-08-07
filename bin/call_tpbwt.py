@@ -37,6 +37,7 @@ parser.add_argument("--Lf", type=float, default=3.0, help="min IBD length in cM"
 parser.add_argument("--mem_gb", type=int, required=True)  # not used
 parser.add_argument("--nthreads", type=int, default=None)
 parser.add_argument("--minmac", type=int, default=1, help="min MAC")
+parser.add_argument("--use_phase_correction", type=int, default=1, choices=[0, 1])
 parser.add_argument("--genome_set_id", type=int, required=True)
 
 args = parser.parse_args()
@@ -51,6 +52,7 @@ template_opt = args.template
 Lm = args.Lm
 Lf = args.Lf
 minmac = args.minmac
+use_phase_correction = True if args.use_phase_correction == 1 else False
 
 # filter by minmac and
 # decompression vcf (required by phasedibd)
@@ -88,7 +90,9 @@ else:
     raise Exception("unknown template")
 
 # call ibd
-ibd_results = tpbwt.compute_ibd(haplotypes, L_f=Lf, L_m=Lm)
+ibd_results = tpbwt.compute_ibd(
+    haplotypes, L_f=Lf, L_m=Lm, use_phase_correction=use_phase_correction
+)
 
 # check ids
 # tpbwt is using index not sample names
