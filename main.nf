@@ -1015,17 +1015,23 @@ process CALL_IBD_HAPIBD_PARAM {
 }
 
 workflow OPTIMIZE_HAPIBD {
+    // single population model
     // only simulating neutral situation
     ch_sp_sets = Channel.fromList(sp_sets.collect {label, args->[label, args]})
     .filter{label, args -> label == 'sp_neu'}
 
+    // multiple population model
     ch_mp_sets = Channel.fromList(mp_sets.collect {label, args->[label, args]})
     .filter{label, args -> label == 'mp_s00'}
 
+    // UK model with human or Pf recombination rates
     ch_uk_sets = Channel.fromList( [
         // all demographic parameters are hard-coded in the slim script
         ["uk_gc0", [seqlen: 60_000_000, gc:0, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60001]],
         ["uk_gc1", [seqlen: 60_000_000, gc:1, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60002]],
+        // the following two lines are models that using UK demograhic patterns but Pf recombination rate
+        ["uk_gc0_pf", [seqlen: 900_000, gc:0, r: 6.6666667e-7, u: 1e-8, nsam: 1000, genome_set_id: 60003]],
+        ["uk_gc1_pf", [seqlen: 900_000, gc:1, r: 6.6666667e-7, u: 1e-8, nsam: 1000, genome_set_id: 60004]],
     ])
 
 
@@ -1058,56 +1064,56 @@ workflow OPTIMIZE_HAPIBD {
     // 
     ch_hapibd_args = Channel.fromList([
         // add minmac 20 (maf>=0.01) default is 2 which would include too many rare variants
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers: 100, minmac:20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  90, minmac:20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  80, minmac:20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  70, minmac:20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  60, minmac:20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  50, minmac:20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  40, minmac:20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  30, minmac:20],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers: 100, minmac:20],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  90, minmac:20],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  80, minmac:20],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  70, minmac:20],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  60, minmac:20],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  50, minmac:20],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  40, minmac:20],
+        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  30, minmac:20],
 
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers: 100, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  30, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  10, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:   3, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers: 100, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  30, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  10, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:   3, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers: 100, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  30, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  10, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:   3, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers: 100, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  30, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  10, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:   3, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers: 100, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  30, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  10, minmac: 20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:   3, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers: 100, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  30, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  10, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:   3, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers: 100, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  30, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  10, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:   3, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers: 100, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  30, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  10, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:   3, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers: 100, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  30, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  10, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:   3, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers: 100, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  30, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  10, minmac: 20],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:   3, minmac: 20],
 
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers: 100, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  30, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  10, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:   3, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers: 100, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  30, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  10, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:   3, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers: 100, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  30, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  10, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:   3, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers: 100, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  30, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  10, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:   3, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers: 100, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  30, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  10, minmac: 200],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:   3, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers: 100, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  30, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  10, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:   3, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers: 100, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  30, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  10, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:   3, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers: 100, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  30, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  10, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:   3, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers: 100, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  30, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  10, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:   3, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers: 100, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  30, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  10, minmac: 200],
+        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:   3, minmac: 200],
     ]).map{args->
         def arg_sp_dir = String.format("ms%d_mo%d_me%d_mg%04d_mm%03d_mac%03d", 
             args.minseed, args.minoutput, args.minextend, args.maxgap, args.minmarkers, args.minmac

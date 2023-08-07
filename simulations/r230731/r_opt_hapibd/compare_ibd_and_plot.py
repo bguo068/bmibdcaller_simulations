@@ -9,10 +9,10 @@ import numpy as np
 import argparse
 
 p = argparse.ArgumentParser()
-p.add_argument("id", type=int, choices=list(range(8)))
+p.add_argument("id", type=int, choices=list(range(12)))
 which = p.parse_args().id
 
-# clearn files
+# clean files
 cmd = """
 rm -rf cmp hapibd map tskibd samples.txt genome.toml
 """
@@ -29,9 +29,9 @@ with open("samples.txt", "w") as f:
 # analyze ishare results
 
 # -------------CHANGE HERE AS NECESSARY
-r = 0.01 / ([15000] * 4 + [1000000] * 4)[which]
-len_bp = ([15000 * 100] * 4 + [1000000 * 60] * 4)[which]
-len_cm = ([100.0] * 4 + [60.0] * 4)[which]
+r = 0.01 / ([15000] * 4 + [1000000] * 4 + [15000] * 4)[which]
+len_bp = ([15000 * 100] * 4 + [1000000 * 60] * 4 + [15000 * 100] * 4)[which]
+len_cm = ([100.0] * 4 + [60.0] * 4 + [100.0] * 4)[which]
 
 
 # prepare map files
@@ -61,7 +61,7 @@ genome_fn = f"./genome.toml"
 with open(genome_fn, "wb") as f:
     tomli_w.dump(genome, f)
 
-min_mac = [20, 200, 20, 200, 20, 200, 20, 200][which]
+min_mac = [20, 200, 20, 200, 20, 200, 20, 200, 20, 200, 20, 200][which]
 genome_set_name = [
     "sp_neu",
     "sp_neu",
@@ -71,8 +71,25 @@ genome_set_name = [
     "uk_gc0",
     "uk_gc1",
     "uk_gc1",
+    "uk_gc0_pf",
+    "uk_gc0_pf",
+    "uk_gc1_pf",
+    "uk_gc1_pf",
 ][which]
-genome_set_id = [10000, 10000, 20000, 20000, 60001, 60001, 60002, 60002][which]
+genome_set_id = [
+    10000,
+    10000,
+    20000,
+    20000,
+    60001,
+    60001,
+    60002,
+    60002,
+    60003,
+    60003,
+    60004,
+    60004,
+][which]
 # copy true ibd
 for chrno in range(1, 15):
     # -------------CHANGE HERE AS NECESSARY
@@ -231,7 +248,20 @@ axes[1][0].text(
     fontsize=10,
 )
 
-demog = ["sp", "sp", "mp", "mp", "uknogc", "uknogc", "ukgc", "ukgc"][which]
+demog = [
+    "sp",
+    "sp",
+    "mp",
+    "mp",
+    "uknogc",
+    "uknogc",
+    "ukgc",
+    "ukgc",
+    "uknogcpf",
+    "uknogcpf",
+    "ukgcpf",
+    "ukgcpf",
+][which]
 id_desc = f"minmarker_maxgap_{demog}_minmac{min_mac}"
 
 
