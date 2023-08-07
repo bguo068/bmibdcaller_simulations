@@ -1139,3 +1139,130 @@ workflow OPTIMIZE_HAPIBD {
     CALL_IBD_TSKIBD(ch_in_ibdcall_trees)
     CALL_IBD_HAPIBD_PARAM(ch_in_ibdcall_vcf_with_params)
 }
+
+
+process CALL_IBD_TPBWT_PARAM {
+    tag "${args.genome_set_id}_${chrno}_tpbwtibd"
+    publishDir "${resdir}/${label}/ibd/tpbwtibd/${arg_sp_dir}", \
+        mode: "symlink", pattern: "*_tpbwtibd.ibd"
+    input:
+    tuple val(label), val(chrno), val(args), path(vcf), val(tpbwt_args), val(arg_sp_dir)
+    output:
+    tuple val(label), val(chrno), path("*_tpbwtibd.ibd")
+    script:
+    // Lm: params.tpbwt_Lm,
+    // Lf: params.tpbwt_Lf,
+    // template: params.tpbwt_template_opts,
+    // minmac
+    // use_phase_correction
+    def cmd_options = (tpbwt_args + [
+        vcf: vcf,
+        r: args.r,
+        seqlen: args.seqlen,
+        chrno: chrno,
+        mem_gb: task.memory.giga,
+        nthreads: task.cpus,
+        genome_set_id: args.genome_set_id,
+    ]).collect{k, v -> "--${k} ${v}"}.join(" ")
+    """
+    call_tpbwt.py ${cmd_options}
+    """
+    stub:
+    """touch ${args.genome_set_id}_${chrno}_tpbwtibd.ibd"""
+}
+
+workflow OPTIMIZE_TPBWT {
+    // single population model
+    // only simulating neutral situation
+    ch_sp_sets = Channel.fromList(sp_sets.collect {label, args->[label, args]})
+    .filter{label, args -> label == 'sp_neu'}
+
+    // multiple population model
+    ch_mp_sets = Channel.fromList(mp_sets.collect {label, args->[label, args]})
+    .filter{label, args -> label == 'mp_s00'}
+
+    // UK model with human or Pf recombination rates
+    ch_uk_sets = Channel.fromList( [
+        // all demographic parameters are hard-coded in the slim script
+        ["uk_gc0", [seqlen: 60_000_000, gc:0, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60001]],
+        // ["uk_gc1", [seqlen: 60_000_000, gc:1, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60002]],
+        // the following two lines are models that using UK demograhic patterns but Pf recombination rate
+        ["uk_gc0_pf", [seqlen: 900_000, gc:0, r: 6.6666667e-7, u: 1e-8, nsam: 1000, genome_set_id: 60003]],
+        // ["uk_gc1_pf", [seqlen: 900_000, gc:1, r: 6.6666667e-7, u: 1e-8, nsam: 1000, genome_set_id: 60004]],
+    ])
+
+
+    // combine with chrnos 
+    ch_chrs = Channel.fromList(1..(params.nchroms))
+
+    // reorder fields
+    ch_sp_input = ch_sp_sets // label, dict (args)
+        .combine( ch_chrs )
+        .map {label, args, chrno -> [label, chrno, args]}
+
+    ch_mp_input = ch_mp_sets // label, dict (args)
+        .combine( ch_chrs )
+        .map {label, args, chrno -> [label, chrno, args]}
+
+    ch_uk_input = ch_uk_sets // label, dict (args)
+        .combine( ch_chrs )
+        .map {label, args, chrno -> [label, chrno, args]}
+
+    // run simulations
+    SIM_SP_CHR(ch_sp_input)
+    SIM_MP_CHR(ch_mp_input)
+    SIM_UK_CHR(ch_uk_input)
+
+    // prepare ibdcaller input
+    ch_trees_vcf = SIM_SP_CHR.out.trees_vcf
+        .concat(SIM_MP_CHR.out.trees_vcf) // label, chrno, trees, vcf
+        .concat(SIM_UK_CHR.out.trees_vcf) // label, chrno, trees, vcf
+
+    // 
+    ch_tpbwt_args = Channel.fromList([
+        // vary Lm
+        [Lm: 300, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
+        [Lm: 100, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
+        [Lm:  30, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
+        [Lm:  10, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
+        [Lm:   3, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
+
+        // vary Lm, change template
+        [Lm: 300, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
+        [Lm: 100, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
+        [Lm:  30, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
+        [Lm:  10, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
+        [Lm:   3, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
+
+        // vary Lm, change minmac: 0
+        [Lm: 300, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
+        [Lm: 100, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
+        [Lm:  30, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
+        [Lm:  10, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
+        [Lm:   3, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
+
+    ]).map{args->
+        def arg_sp_dir = String.format("lm%d_lf%f_tp%d_pc%04d_mac%03d", 
+            args.Lm, args.Lf, args.template, args.use_phase_correction, args.minmac
+        )
+        [args, arg_sp_dir]
+    }
+    if (params.test) {
+        ch_tpbwt_args = ch_tpbwt_args.take(1)
+    }
+
+    ch_in_ibdcall_trees = ch_trees_vcf
+        .combine(ch_sp_sets.concat(ch_mp_sets).concat(ch_uk_sets), by:0)
+        .map{label, chrno, trees, vcf, args -> [label, chrno, args, trees] }
+
+    ch_in_ibdcall_vcf = ch_trees_vcf
+        .combine(ch_sp_sets.concat(ch_mp_sets).concat(ch_uk_sets), by:0)
+        .map{label, chrno, trees, vcf, args -> [label, chrno, args, vcf] }
+    
+    ch_in_ibdcall_vcf_with_params = ch_in_ibdcall_vcf 
+        .combine(ch_tpbwt_args) // label, chrno, args, vcf, hapibd_args, arg_sp_dir
+
+    // call hmmibd
+    CALL_IBD_TSKIBD(ch_in_ibdcall_trees)
+    CALL_IBD_TPBWT_PARAM(ch_in_ibdcall_vcf_with_params)
+}
