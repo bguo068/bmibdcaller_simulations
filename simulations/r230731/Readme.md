@@ -2,16 +2,19 @@
 
 1. Are optimized parameters demographic model-specific? Would parameters
 optimized for single pop module be different from those for multiple pop model.
-    - What are the NP/FP rate if we the simulation model from hap-ibd paper?
+    - What are the NP/FP rate if we use the simulation model from hap-ibd paper?
     - url: https://www.sciencedirect.com/science/article/pii/S0002929720300525
 
 ```
 1. With uk populiaton model and human evolutionary parameters, hapibd has good quality
+    - If pf recombinate rate is used (under UK demographic model), FP/NP went up
+    - Optimized parameter are quite different when using pf recombination rate 
+    - Change the demographic model does not dramatically change the optimized parameter
 2. With single/multiple population model, hapidbd results highly depend on minmarker parameter
 3. maf > 0.1 generate worse results than maf>0.01 
     - maf >= 0.001 (a.k.a no filter) can generate worse result, for instance (data not included in git)
     in the multiple population model 
-4. gene conversion versus recombination only does not change the results much (in uk human model)
+4. gene conversion versus recombination does not change the results much (in uk human model)
 5. for pf single/mutiple model, minmarker = 70 or 80 seems to the best parameter.
 
 NOTE:
@@ -48,8 +51,11 @@ selection detection?
     - Define and calculate the rate of IBD segment breakdown and IBD merging
     - how are these rate related to bias in Ne estimates and IBD length - time
     relationship? What is the metric to analyze this?
+
+
+OUT OF SCOPE OF AIM2
 5. Merging IBD segments can cause overestimating estimates of relatedness.
     - isorelate infer IBD in monclonal infection vs polyclonal infection
-    simulations
-6. hmmibd model suffers from deconvolution errors.
+    simulations (long-term goal, )
+6. hmmibd model suffers from deconvolution errors. (gene-conversion?) (long-term goal)
     - True dominant clone and inferred dominant clone
