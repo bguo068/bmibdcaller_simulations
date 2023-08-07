@@ -8,6 +8,7 @@ import argparse
 from pathlib import Path
 import sys
 import subprocess
+from pathlib import Path
 
 # --------------------- parse arguments -----------------------------
 parser = argparse.ArgumentParser(
@@ -35,12 +36,13 @@ parser.add_argument(
 parser.add_argument("--Lf", type=float, default=3.0, help="min IBD length in cM")
 parser.add_argument("--mem_gb", type=int, required=True)  # not used
 parser.add_argument("--nthreads", type=int, default=None)
+parser.add_argument("--minmac", type=int, default=1, help="min MAC")
 parser.add_argument("--genome_set_id", type=int, required=True)
 
 args = parser.parse_args()
 
 vcf = args.vcf
-bp_per_cm = int(0.01/args.r)
+bp_per_cm = int(0.01 / args.r)
 seqlen_in_cm = args.seqlen / bp_per_cm
 chrno = args.chrno
 mem_gb = args.mem_gb
@@ -48,12 +50,16 @@ nthreads = args.nthreads
 template_opt = args.template
 Lm = args.Lm
 Lf = args.Lf
+minmac = args.minmac
 
-# decompress vcf file if needed
-if Path(vcf).suffix == ".gz":
-    # use '-dc' option to avoid deleting original gz file
-    subprocess.run(f"gzip -dc {vcf} > {chrno}.vcf", shell=True)
-    vcf = f"{chrno}.vcf"
+# filter by minmac and
+# decompression vcf (required by phasedibd)
+nsam = len(allel.read_vcf_headers(vcf).samples)
+minmaf = minmac / nsam / 2
+subprocess.run(
+    f"bcftools view -q {minmaf}:minor {vcf} > tmp.vcf", shell=True, check=True
+)
+vcf = f"tmp.vcf"
 
 # make a map for every snp position of the vcf file
 data = allel.read_vcf(vcf, fields=["variants/POS", "variants/CHROM", "samples"])
@@ -112,7 +118,11 @@ ibd_df = pd.DataFrame(
 ofn = f"{args.genome_set_id}_{chrno}_tpbwtibd.ibd"
 ibd_df.to_csv(ofn, sep="\t", header=True, index=None)
 
-print(f"""
+print(
+    f"""
     output: 
         {ofn}
-     """)
+     """
+)
+# remove the temporiy vcf file
+Path("tmp.vcf").unlink()
