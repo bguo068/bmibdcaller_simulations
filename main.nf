@@ -1222,24 +1222,39 @@ workflow OPTIMIZE_TPBWT {
     ch_tpbwt_args = Channel.fromList([
         // vary Lm
         [Lm: 300, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
+        [Lm: 250, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
+        [Lm: 200, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
+        [Lm: 150, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
         [Lm: 100, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
+        [Lm:  80, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
+        [Lm:  50, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
         [Lm:  30, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
-        [Lm:  10, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
-        [Lm:   3, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
+        // [Lm:  10, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
+        // [Lm:   3, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
 
         // vary Lm, change template
         [Lm: 300, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
+        [Lm: 250, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
+        [Lm: 200, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
+        [Lm: 150, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
         [Lm: 100, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
+        [Lm:  80, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
+        [Lm:  50, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
         [Lm:  30, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
-        [Lm:  10, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
-        [Lm:   3, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
+        // [Lm:  10, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
+        // [Lm:   3, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
 
         // vary Lm, change minmac: 0
         [Lm: 300, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
+        [Lm: 250, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
+        [Lm: 200, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
+        [Lm: 150, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
         [Lm: 100, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
+        [Lm:  80, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
+        [Lm:  50, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
         [Lm:  30, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
-        [Lm:  10, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
-        [Lm:   3, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
+        // [Lm:  10, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
+        // [Lm:   3, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
 
     ]).map{args->
         def arg_sp_dir = String.format("lm%d_lf%f_tp%d_pc%04d_mac%03d", 
