@@ -2,6 +2,7 @@
 import argparse
 import subprocess
 from pathlib import Path
+import allel
 
 import pandas as pd
 
@@ -17,10 +18,12 @@ parser.add_argument("--vcf", type=str, required=True, help="input vcf file")
 parser.add_argument("--r", type=float, required=True)
 parser.add_argument("--seqlen", type=int, required=True)
 parser.add_argument("--chrno", type=int, required=True)
+parser.add_argument("--window", type=float, default=40.0)
 parser.add_argument("--lod", type=float, default=0.3)
 parser.add_argument("--length", type=float, default=2.0)
 parser.add_argument("--scale", type=float, default=0)
 parser.add_argument("--mem_gb", type=int, required=True)
+parser.add_argument("--minmac", type=int, default=1, help="min MAC")
 parser.add_argument("--nthreads", type=int, default=None)
 parser.add_argument("--genome_set_id", type=int, required=True)
 
@@ -30,11 +33,23 @@ vcf = args.vcf
 bp_per_cm = int(0.01 / args.r)
 seqlen_in_cm = args.seqlen / bp_per_cm
 chrno = args.chrno
+window = args.window
 lod = args.lod
 length = args.length
 scale = args.scale
+minmac = args.minmac
 mem_gb = args.mem_gb
 nthreads = args.nthreads
+
+# filter by minmac and
+# decompression vcf (required by phasedibd)
+nsam = len(allel.read_vcf_headers(vcf).samples)
+minmaf = minmac / nsam / 2
+subprocess.run(
+    f"bcftools view -q {minmaf}:minor {vcf} -Oz -o tmp.vcf.gz", shell=True, check=True
+)
+vcf = f"tmp.vcf.gz"
+
 
 # ------------------- make genetic map ----------------------------
 with open(f"{chrno}.map", "w") as f:
@@ -48,7 +63,7 @@ map_fn = f"{chrno}.map"
 cmd = (
     f"java -Xss5M -Xmx{mem_gb}g -jar {refinedibd_jar} gt={vcf} map={map_fn}"
     f" nthreads={nthreads} out={chrno} chrom={chrno}"
-    f" lod={lod} scale={scale} length={length}"
+    f" lod={lod} window={window} scale={scale} length={length}"
 )
 print(cmd)
 res = subprocess.run(cmd.split(), text=True, capture_output=True)
@@ -85,3 +100,5 @@ print(
         {ofn}
      """
 )
+
+Path("tmp.vcf.gz").unlink()
