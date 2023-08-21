@@ -1573,3 +1573,154 @@ workflow OPTIMIZE_HMMIBD {
     CALL_IBD_TSKIBD(ch_in_ibdcall_trees)
     CALL_IBD_HMMIBD_PARAM(ch_in_ibdcall_vcf_with_params)
 }
+
+process CALL_IBD_ISORELATE_PARAM {
+    tag "${args.genome_set_id}_${chrno}_isorelate"
+    publishDir "${resdir}/${label}/ibd/isorelate/${arg_sp_dir}", \
+        mode: "symlink", pattern: "*_isorelate.ibd"
+    input:
+    tuple val(label), val(chrno), val(args), path(vcf), val(isorelate_args), val(arg_sp_dir)
+    output:
+    tuple val(label), val(chrno), path("*_isorelate.ibd")
+    script:
+        // maf: params.maf,
+        // min_snp: params.isorelate_min_snp,
+    def cmd_options = (isorelate_args + [
+        vcf: vcf,
+        r: args.r,
+        seqlen: args.seqlen,
+        chrno: chrno,
+        min_len_bp: Math.round(params.mincm * (0.01/args.r)),
+        imiss: params.isorelate_imiss,
+        vmiss: params.isorelate_vmiss,
+        cpus: task.cpus,
+        genome_set_id: args.genome_set_id,
+    ]).collect{k, v -> "--${k} ${v}"}.join(" ")
+    """
+    call_isorelate.py ${cmd_options}
+    """
+    stub:
+    """touch ${args.genome_set_id}_${chrno}_isorelate.ibd"""
+}
+
+workflow OPTIMIZE_ISORELATE {
+    // single population model
+    // only simulating neutral situation
+    ch_sp_sets = Channel.fromList(sp_sets.collect {label, args->[label, args]})
+    .filter{label, args -> label == 'sp_neu'}
+
+    // multiple population model
+    ch_mp_sets = Channel.fromList(mp_sets.collect {label, args->[label, args]})
+    .filter{label, args -> label == 'mp_s00'}
+
+    // UK model with human or Pf recombination rates
+    ch_uk_sets = Channel.fromList( [
+        // all demographic parameters are hard-coded in the slim script
+
+        // NOTE: uk-human model is too big for isorelate (memory error)
+        // ["uk_gc0", [seqlen: 60_000_000, gc:0, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60001]],
+        // ["uk_gc1", [seqlen: 60_000_000, gc:1, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60002]],
+        // the following two lines are models that using UK demograhic patterns but Pf recombination rate
+        ["uk_gc0_pf", [seqlen: 900_000, gc:0, r: 6.6666667e-7, u: 1e-8, nsam: 1000, genome_set_id: 60003]],
+        // ["uk_gc1_pf", [seqlen: 900_000, gc:1, r: 6.6666667e-7, u: 1e-8, nsam: 1000, genome_set_id: 60004]],
+    ])
+
+
+    // combine with chrnos 
+    ch_chrs = Channel.fromList(1..(params.nchroms))
+
+    // reorder fields
+    ch_sp_input = ch_sp_sets // label, dict (args)
+        .combine( ch_chrs )
+        .map {label, args, chrno -> [label, chrno, args]}
+
+    ch_mp_input = ch_mp_sets // label, dict (args)
+        .combine( ch_chrs )
+        .map {label, args, chrno -> [label, chrno, args]}
+
+    ch_uk_input = ch_uk_sets // label, dict (args)
+        .combine( ch_chrs )
+        .map {label, args, chrno -> [label, chrno, args]}
+
+    // run simulations
+    SIM_SP_CHR(ch_sp_input)
+    SIM_MP_CHR(ch_mp_input)
+    SIM_UK_CHR(ch_uk_input)
+
+    // prepare ibdcaller input
+    ch_trees_vcf = SIM_SP_CHR.out.trees_vcf
+        .concat(SIM_MP_CHR.out.trees_vcf) // label, chrno, trees, vcf
+        .concat(SIM_UK_CHR.out.trees_vcf) // label, chrno, trees, vcf
+
+    // 
+    ch_isorelate_args = Channel.fromList([
+        [maf: 0.0, min_snp: 1],
+        [maf: 0.0, min_snp: 3],
+        [maf: 0.0, min_snp: 10],
+        [maf: 0.0, min_snp: 15],
+        [maf: 0.0, min_snp: 20],
+        [maf: 0.0, min_snp: 40],
+        [maf: 0.0, min_snp: 80],
+        [maf: 0.0, min_snp:160],
+
+        [maf: 0.01, min_snp: 1],
+        [maf: 0.01, min_snp: 3],
+        [maf: 0.01, min_snp: 10],
+        [maf: 0.01, min_snp: 15],
+        [maf: 0.01, min_snp: 20],
+        [maf: 0.01, min_snp: 40],
+        [maf: 0.01, min_snp: 80],
+        [maf: 0.01, min_snp:160],
+
+        [maf: 0.03, min_snp: 1],
+        [maf: 0.03, min_snp: 3],
+        [maf: 0.03, min_snp: 10],
+        [maf: 0.03, min_snp: 15],
+        [maf: 0.03, min_snp: 20],
+        [maf: 0.03, min_snp: 40],
+        [maf: 0.03, min_snp: 80],
+        [maf: 0.03, min_snp:160],
+
+        [maf: 0.1, min_snp: 1],
+        [maf: 0.1, min_snp: 3],
+        [maf: 0.1, min_snp: 10],
+        [maf: 0.1, min_snp: 15],
+        [maf: 0.1, min_snp: 20],
+        [maf: 0.1, min_snp: 40],
+        [maf: 0.1, min_snp: 80],
+        [maf: 0.1, min_snp:160],
+
+        [maf: 0.3, min_snp: 1],
+        [maf: 0.3, min_snp: 3],
+        [maf: 0.3, min_snp: 10],
+        [maf: 0.3, min_snp: 15],
+        [maf: 0.3, min_snp: 20],
+        [maf: 0.3, min_snp: 40],
+        [maf: 0.3, min_snp: 80],
+        [maf: 0.3, min_snp:160],
+    ]).map{args->
+        def arg_sp_dir = String.format("maf%f_minsnp%d", 
+            args.maf, args.min_snp
+        )
+        [args, arg_sp_dir]
+    }
+    if (params.test) {
+        ch_isorelate_args = ch_isorelate_args.take(1)
+    }
+
+    ch_in_ibdcall_trees = ch_trees_vcf
+        .combine(ch_sp_sets.concat(ch_mp_sets).concat(ch_uk_sets), by:0)
+        .map{label, chrno, trees, vcf, args -> [label, chrno, args, trees] }
+
+    ch_in_ibdcall_vcf = ch_trees_vcf
+        .combine(ch_sp_sets.concat(ch_mp_sets).concat(ch_uk_sets), by:0)
+        .map{label, chrno, trees, vcf, args -> [label, chrno, args, vcf] }
+    
+    ch_in_ibdcall_vcf_with_params = ch_in_ibdcall_vcf 
+        .combine(ch_isorelate_args) // label, chrno, args, vcf, hapibd_args, arg_sp_dir
+
+    // call hmmibd
+    CALL_IBD_TSKIBD(ch_in_ibdcall_trees)
+    CALL_IBD_ISORELATE_PARAM(ch_in_ibdcall_vcf_with_params)
+}
+
