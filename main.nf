@@ -1,30 +1,33 @@
 nextflow.enable.dsl=2
 
-params.maf = params.test ? 0.00001: 0.01
-params.mincm = 2.0
-params.num_neutral_chrs = 0
-params.nchroms = 14
+params.test = false
+params.resdir = "res"
+
+params.min_mac = 20 // assuming homozyogous diploids, eg. min_maf 20 / 2 / 1000 = 0.01
 
 params.tpbwt_template_opts = 1
-params.tpbwt_Lm = params.test ? 152: 300
+params.tpbwt_Lm = params.test ? 152: 100 // optimized
 params.tpbwt_Lf = params.mincm
+params.tpbwt_use_phase_correction = 0
 
 params.hapibd_minoutput = params.mincm
 params.hapibd_minseed = params.mincm
 params.hapibd_minextend = 1.0
 params.hapibd_maxgap = 1000
-params.hapibd_minmarkers = 100
+params.hapibd_minmarkers = 70
 
 params.refinedibd_length = params.mincm
-params.refinedibd_lod = 3.0
+params.refinedibd_lod = 1.1 // TODO: confirm what does lod mean
 params.refinedibd_scale = 0
+params.refinedibd_window = 40.0
 
 params.hmmibd_n = 100
 params.hmmibd_m = 5
 
 params.isorelate_imiss = 0.3
 params.isorelate_vmiss = 0.3
-params.isorelate_min_snp = 100
+params.isorelate_min_snp = 20 // optimized
+params.isorelate_min_mac = 200 // 0.1, which is different from other callers
 
 params.tsinferibd_max_tmrca = [1000, 3000]
 
@@ -302,6 +305,7 @@ process CALL_IBD_HAPIBD {
         maxgap: params.hapibd_maxgap,
         minextend: params.hapibd_minextend,
         minmarkers: params.hapibd_minmarkers,
+        minmac: params.min_mac,
         mem_gb: task.memory.giga,
         nthreads: task.cpus,
         genome_set_id: args.genome_set_id,
@@ -357,6 +361,8 @@ process CALL_IBD_REFINEDIBD {
         length: params.refinedibd_length,
         scale: params.refinedibd_scale,
         mem_gb: task.memory.giga,
+        minmac: params.min_mac,
+        window: params.refinedibd_window,
         nthreads: task.cpus,
         genome_set_id: args.genome_set_id,
     ].collect{k, v -> "--${k} ${v}"}.join(" ")
@@ -381,7 +387,9 @@ process CALL_IBD_TPBWT {
         r: args.r,
         seqlen: args.seqlen,
         chrno: chrno,
-        template: params.tpbwt_template_opts,
+        template: params.tpbwt_template_opts, 
+        use_phase_correction: params.tpbwt_use_phase_correction,
+        minmac: params.min_mac,
         Lm: params.tpbwt_Lm,
         Lf: params.tpbwt_Lf,
         mem_gb: task.memory.giga,
@@ -412,6 +420,7 @@ process CALL_IBD_HMMIBD {
         n: params.hmmibd_n,
         m: params.hmmibd_m,
         mincm: params.mincm,
+        minmac: params.min_mac,
         genome_set_id: args.genome_set_id,
     ].collect{k, v -> "--${k} ${v}"}.join(" ")
     script:
