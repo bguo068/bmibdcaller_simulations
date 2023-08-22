@@ -12,7 +12,7 @@ def get_args(cmd_args=None):
     parser.add_argument("--chrno", type=int, required=True)
     parser.add_argument("--min_snp", type=int, default=20)
     parser.add_argument("--min_len_bp", type=int, default=50000)
-    parser.add_argument("--maf", type=float, required=True)
+    parser.add_argument("--minmac", type=int, required=True)
     parser.add_argument("--imiss", type=float, required=True)
     parser.add_argument("--vmiss", type=float, required=True)
     parser.add_argument("--cpus", type=int, default=4)
@@ -30,7 +30,8 @@ min_snp = args.min_snp
 min_len_bp = args.min_len_bp
 bp_per_cm = 0.01 / args.r
 seqlen_in_cm = args.seqlen / bp_per_cm
-maf = args.maf
+# use `minmac` instead of `maf` to make it consistent across different IBD callers
+minmac = args.minmac
 imiss = args.imiss
 vmiss = args.vmiss
 chrno = args.chrno
@@ -50,13 +51,15 @@ ofn = f"{args.genome_set_id}_{chrno}_isorelate.ibd"
 r_code = f"""
 ped <- read.delim("ped.ped", sep=' ', header=F)
 ped[, 5] <- 1
+nsample = nrow(ped)
+maf = {minmac} / 2.0 / nsample
 map <- read.delim("ped.map", sep=' ', header=F)
 ped_map <- list(ped=ped, map=map)
 library(isoRelate)
 # reformat and filter genotypes
 my_genotypes <- getGenotypes(ped.map = ped_map,
                              reference.ped.map = NULL,
-                             maf = {maf},
+                             maf = maf,
                              isolate.max.missing = {imiss},
                              snp.max.missing = {vmiss},
                              chromosomes = NULL,
