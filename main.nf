@@ -33,6 +33,7 @@ params.isorelate_min_mac = 200 // 0.1, which is different from other callers
 
 // params.tsinferibd_max_tmrca = [1000, 3000]
 
+params.filt_ibd_by_ov = false
 params.ibdne_mincm = params.mincm
 params.ibdne_minregion = 10
 params.ibdne_flatmeth = ["none", "keep_hap_1_only", "merge"][0]
@@ -508,7 +509,7 @@ process PROC_DIST_NE {
          pattern: "*.ibdne.ibdobj.gz", mode: 'symlink'
 
     input:
-        tuple val(label),val(ibdcaller), path(ibd_lst), path(vcf_lst), val(genome_set_id)
+        tuple val(label),val(ibdcaller), path(ibd_lst), path(ibd_lst_true), path(vcf_lst), val(genome_set_id)
         path(ibdne_jar)
     output:
         tuple val(label),val(ibdcaller),  path("ibdne.jar"), path("*_orig.sh"), \
@@ -518,7 +519,10 @@ process PROC_DIST_NE {
         tuple val(label),val(ibdcaller),  path("*.ibddist.ibdobj.gz"), emit: ibddist_ibd_obj
         tuple val(label),val(ibdcaller),  path("*.ibdne.ibdobj.gz"), emit: ibdne_ibd_obj
     script:
-    def args_local = [
+    // Whether to pass in true ibd list is determined by params.filt_ibd_by_ov 
+    def true_ibd_arg = (params.filt_ibd_by_ov && (ibdcaller!="tskibd")) ? \
+         [ibd_files_true: "${ibd_lst_true}"] : [:]
+    def args_local = (true_ibd_arg + [
         ibd_files: "${ibd_lst}", // path is a blank separate list
         vcf_files: "${vcf_lst}", // path is a blank separate list
         genome_set_id: genome_set_id,
@@ -526,7 +530,7 @@ process PROC_DIST_NE {
         ibdne_minregion: params.ibdne_minregion,
         ibdne_jar: ibdne_jar,
         ibdne_flatmeth: params.ibdne_flatmeth,
-    ].collect{k, v-> "--${k} ${v}"}.join(" ")
+    ]).collect{k, v-> "--${k} ${v}"}.join(" ")
     """
     proc_dist_ne.py ${args_local} 
     """
@@ -689,9 +693,26 @@ workflow WF_SP {
             def label = key[0]
             def ibdcaller = key[1]
             def ibd_lst = data_lst.collect{data -> data[1]}
-            return [label, ibdcaller, ibd_lst]
+            return ["${label}", ibdcaller, ibd_lst]
         }
     // ch_out_ibd_grp.map{it-> [it[0], it[1], it[2].size()]}.view()
+
+    ch_true_ibd = CALL_IBD_TSKIBD.out // [label, chrno, ibd]
+        .map{label, chrno, ibd-> [groupKey(label, params.nchroms), [chrno, ibd]]}
+        .groupTuple(by: 0, sort: {a, b-> a[0]<=>b[0]})  // groupby label, sort by chrno
+        .map{key, data_lst -> 
+            def label = key.toString()
+            def ibd_files_true = data_lst.collect{v -> v[1]}
+            [label, ibd_files_true]
+        }
+
+    ch_out_ibd_grp = ch_out_ibd_grp
+        // combine with true ibd list
+        .combine(ch_true_ibd, by: 0)
+        .map{label, ibdcaller, ibd_lst, ibd_list_true->
+            // fix name collision for tskibd as true and inferrre ibd are the same
+            [label, ibdcaller, ibd_lst, ibdcaller=="tskibd" ? [] : ibd_list_true]
+         }
 
     ch_out_vcf_grp = SIM_SP_CHR.out.trees_vcf
         .map{label, chrno, _trees, vcf -> 
@@ -705,7 +726,7 @@ workflow WF_SP {
         }
 
     ch_grouped_ibd_vcf = ch_out_ibd_grp.combine(ch_out_vcf_grp, by: 0)
-        // [label, ibdcaller, ibd_lst, vcf_lst]
+        // [label, ibdcaller, ibd_lst, ibd_lst_true, vcf_lst]
         .combine(
             // add genome_set_id
             ch_sp_sets.map{label, args -> 
@@ -714,10 +735,12 @@ workflow WF_SP {
             },
             by: 0
         )
-        // [label, ibdcaller, ibd_lst, vcf_lst, genome_set_id]
+        // [label, ibdcaller, ibd_lst, ibd_lst_true, vcf_lst, genome_set_id]
         //                                      ^^^^^^^^^^^^^^
 
     // ********************** Process ibd ***************************
+    // NOTE: although the ibd_files_true is passed, but it can still not used 
+    // depending the params.filt_ibd_by_ov = True
     PROC_DIST_NE( ch_grouped_ibd_vcf, file("${projectDir}/lib/ibdne.23Apr20.ae9.jar") )
      // out.ne_input_orig
      // out.ne_input_rmpeaks

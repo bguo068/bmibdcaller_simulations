@@ -61,7 +61,7 @@
 	rm -rf phasedibd
 	```
 
-## setup tskibd
+## setup tskibd and tskibd-filter
 ```
 	conda activate bmibdcaller_simulations
 	git clone git@github.com:gbinux/tskibd.git
@@ -70,6 +70,11 @@
 	meson build
 	ninja -C build tskibd
 	cp  build/tskibd $CONDA_PREFIX/bin/
+	# assuming cargo/rust is installed.
+	cd tskibd-filter
+	cargo build --release
+	cp target/release/tskibd-filter $CONDA_PREFIX/bin/
+	cd ..
 	cd ..
 	rm -rf tskibd
 ```

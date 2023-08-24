@@ -4,12 +4,14 @@ import ibdutils.utils.ibdutils as ibdutils
 import ibdutils.runner.ibdne as ibdne
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from pathlib import Path
+from subprocess import run
 
 ibd_jar_default = str(Path(__file__).parent / "ibdne.jar")
 
 # parse arguments
 pa = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
 pa.add_argument("--ibd_files", type=str, nargs=14, required=True)
+pa.add_argument("--ibd_files_true", type=str, nargs=14, default=[])
 pa.add_argument("--vcf_files", type=str, nargs=14, required=True)
 pa.add_argument("--genome_set_id", type=str, required=True)
 pa.add_argument("--ibdne_jar", type=str, default=ibd_jar_default)
@@ -20,6 +22,7 @@ args = pa.parse_args()
 
 assert args.ibdne_jar is not None
 assert args.ibdne_flatmeth in ["none", "merge", "keep_hap_1_only"]
+
 
 idx = args.genome_set_id
 ibdne_mincm = args.ibdne_mincm
@@ -54,16 +57,38 @@ of_ibddist_obj = f"{label_str}.ibddist.ibdobj.gz"
 ibd.pickle_dump(of_ibddist_obj)
 
 
-# remove highly relatedness samples
+# make a matrix before possile loading of filterred IBD
 mat = ibd.make_ibd_matrix()
+
+# if the true IBD passed in, we can run tskibd-ibd filter.
+# We then read the filter IBD (for IBDNe) and replace the IBD dataframe of the
+# IBD object
+ibd_files_filtered = []
+if len(args.ibd_files_true) != 0:
+    assert len(args.ibd_files_true) == 14
+    # call tskibd-filter per chromosome
+    for i, chrno in enumerate(range(1, 15)):
+        inf = args.ibd_files[i]
+        tru = args.ibd_files_true[i]
+        out = f"filt_{chrno}.ibd"
+        cmd = f"tskibd-filter {inf} {tru} -o {out} "
+        run(cmd, shell=True, check=True)
+        ibd_files_filtered.append(out)
+    # load filterred IBD
+    ibd_filt = ibdutils.IBD(genome=genome_14_100, label=f"{label_str}_orig")
+    ibd_filt.read_ibd(ibd_fn_lst=ibd_files_filtered)
+    # replace `_df` member of ibd variable but not the `coverage` and `peaks`
+    ibd._df = ibd_filt._df
+
+# remove highly relatedness samples
 unrelated_samples = ibd.get_unrelated_samples(ibdmat=mat)
 ibd.subset_ibd_by_samples(subset_samples=unrelated_samples)
-
 
 # ######################################
 # prepare input for IBDNe
 
 #  remove ibd with tmrca < 1.5 (required according to IBDNe paper)
+# this is only useful for tskibd ibd. IBD from other callers have tmrca set to 100
 ibd.filter_ibd_by_time(min_tmrca=1.5)
 
 ibd.filter_ibd_by_length(min_seg_cm=ibdne_mincm)
