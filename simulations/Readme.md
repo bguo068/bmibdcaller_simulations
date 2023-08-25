@@ -5,3 +5,5 @@
 4. r230811: optimizing parameters for refinedibd
 5. r230814: optimizing parameters for isorelate
 6. r230815: optimizing parameters for hmmibd
+7. r230821: benchmark IBD callers using optimized parameters via downstream
+analyses
