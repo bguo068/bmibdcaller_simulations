@@ -8,6 +8,7 @@ import pickle
 import tomli_w
 from subprocess import run
 from shutil import rmtree
+import igraph as ig
 
 indir = Path("./analysis_res/info")
 indir.mkdir(parents=True, exist_ok=True)
@@ -47,6 +48,28 @@ simulations = [
 
 ibdcallers = "tskibd hapibd  hmmibd  isorelate  refinedibd  tpbwt".split()
 
+outdir = Path("./analysis_res")
+outdir.mkdir(exist_ok=True, parents=True)
+# ------------------------- plot coverage and peaks --------------------------
+
+for model in ["sp_s03", "mp_s03"]:
+    fig, axes = plt.subplots(
+        nrows=6,
+        ncols=1,
+        figsize=(10, 8),
+        constrained_layout=True,
+        sharex=True,
+        sharey=True,
+    )
+    for icaller, caller in enumerate(ibdcallers):
+        ax = axes[icaller]
+        if icaller == 0:
+            ax.set_title(model)
+        IBD.pickle_load(ibdobj_path_res["sp_s03", caller]).plot_coverage(
+            ax, label=caller, which="xirsfilt", plot_proportions=False
+        )
+    fig.savefig(f"{outdir}/coverage_{model}.png", dpi=600)
+
 # -------------------------------------------------------------
 
 df = pd.DataFrame(
@@ -74,8 +97,6 @@ for icaller, label in enumerate(
         ax.get_xticklabels(), rotation=45, rotation_mode="anchor", va="top", ha="right"
     )
 
-outdir = Path("./analysis_res")
-outdir.mkdir(exist_ok=True, parents=True)
 fig.savefig(f"{outdir}/signal_noise.png", dpi=600)
 
 # ------------------------------------------------------------------------
@@ -149,6 +170,77 @@ fig.suptitle("rm_mode = orig")
 outdir = Path("./analysis_res")
 outdir.mkdir(exist_ok=True, parents=True)
 fig.savefig(f"{outdir}/ne.png", dpi=600)
+
+# ------------------------- infomap ---------------------------------------
+
+
+def transform_ifm_df(df):
+    """transform infomap df to a 5x5 matrix
+
+    args:
+    -----
+    df: infomap df (contains Sample, Rank, Population columns)
+
+    columns: community label
+    rows: true population label
+    cells: number of samples with a given true population label and a given
+    community label
+
+    """
+    df = (
+        df.groupby(["Population", "Rank"])["Sample"]
+        .count()
+        .unstack()
+        .fillna(0)
+        .astype(int)
+        .iloc[:, :5]
+        .copy()
+    )
+    df = df.sort_values(by=df.index.to_list(), axis=1, ascending=False)
+    df.columns = [f"c{i+1}" for i in range(0, 5)]
+    df.index = [f"p{i+1}" for i in range(0, 5)]
+    return df
+
+
+def get_adj_rank(df):
+    """get adjusted rand index from infomap df"""
+    adj_rand = ig.compare_communities(ifm.Rank, ifm.Population, method="adjusted_rand")
+    return adj_rand
+
+
+fig = plt.figure(figsize=(12, 8), constrained_layout=True)
+fig, axes = plt.subplots(nrows=4, ncols=7, figsize=(12, 8), constrained_layout=True)
+for ilabel, label in enumerate(["mp_s00", "mp_s01", "mp_s02", "mp_s03"]):
+    adj_rank_lst = []
+    for icaller, caller in enumerate(ibdcallers):
+        ifm = ifm_res[(label, caller, "orig")]
+        adj_rank = get_adj_rank(ifm)
+        adj_rank_lst.append(adj_rank)
+        ax = axes[ilabel, icaller]
+        df = transform_ifm_df(ifm)
+        ax.imshow(
+            df, cmap="Blues", vmin=0, vmax=200, interpolation="none", aspect="auto"
+        )
+        ax.set_xticks(np.arange(0, 5))
+        ax.set_xticklabels(df.columns)
+        ax.set_yticks(np.arange(0, 5))
+        ax.set_yticklabels(df.index)
+        if ilabel == 0:
+            ax.set_title(caller)
+        if ilabel == 3:
+            ax.set_xlabel("community label")
+        if icaller == 0:
+            ax.set_ylabel(f"{label}\n\ntrue pop label")
+    ax = axes[ilabel, 6]
+    ax.bar(np.arange(len(ibdcallers)), adj_rank_lst)
+    ax.set_xticks(np.arange(len(ibdcallers)))
+    ax.set_xticklabels(ibdcallers, rotation=45, rotation_mode="anchor", ha="right")
+    ax.set_ylabel("adjusted rand index")
+    ax.set_ylim(0, 1)
+    if ilabel == 0:
+        ax.set_title("adjusted rand index")
+fig.savefig(f"{outdir}/infomap.png", dpi=600)
+
 
 # ------------------------- IBD comparision -----------------------------------
 
