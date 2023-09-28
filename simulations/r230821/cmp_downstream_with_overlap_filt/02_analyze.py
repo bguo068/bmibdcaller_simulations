@@ -70,7 +70,6 @@ for model in ["sp_s03", "mp_s03"]:
         )
     fig.savefig(f"{outdir}/coverage_{model}.png", dpi=600)
 
-exit(0)
 
 # -------------------------------------------------------------
 
@@ -206,7 +205,7 @@ def transform_ifm_df(df):
 
 def get_adj_rank(df):
     """get adjusted rand index from infomap df"""
-    adj_rand = ig.compare_communities(ifm.Rank, ifm.Population, method="adjusted_rand")
+    adj_rand = ig.compare_communities(df.Rank, df.Population, method="adjusted_rand")
     return adj_rand
 
 
