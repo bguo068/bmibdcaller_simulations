@@ -8,7 +8,7 @@ import pickle
 import tomli_w
 from subprocess import run
 from shutil import rmtree
-import igraph as ig
+from igraph import ig
 
 indir = Path("./analysis_res/info")
 indir.mkdir(parents=True, exist_ok=True)
@@ -69,7 +69,6 @@ for model in ["sp_s03", "mp_s03"]:
             ax, label=caller, which="xirsfilt", plot_proportions=False
         )
     fig.savefig(f"{outdir}/coverage_{model}.png", dpi=600)
-
 
 # -------------------------------------------------------------
 
