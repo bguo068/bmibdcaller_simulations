@@ -1,0 +1,17 @@
+~/.local/bin/nextflow /local/chib/toconnor_grp/bing/bmibdcaller_simulations/main2.nf \
+    -resume \
+    -profile sge \
+    --tpbwt_template_opts 0 \
+    --tpbwt_Lm 300 \
+    --tpbwt_use_phase_correction 1 \
+    --hapibd_minseed 2.0 \
+    --hapibd_minextend 1.0 \
+    --hapibd_maxgap 1000 \
+    --hapibd_minmarkers 100 \
+    --refinedibd_lod 3.0 \
+    --refinedibd_scale 0 \
+    --refinedibd_window 40.0 \
+    --hmmibd_n 999999999 \
+    --hmmibd_m 5 \
+    --isorelate_min_snp 20 \
+    --isorelate_min_mac 20
