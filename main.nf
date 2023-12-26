@@ -1,3 +1,5 @@
+import groovy.json.JsonSlurper
+
 nextflow.enable.dsl=2
 
 params.test = false
@@ -22,6 +24,7 @@ params.refinedibd_length = params.mincm
 params.refinedibd_lod = 1.1 // TODO: confirm what does lod mean
 params.refinedibd_scale = 0
 params.refinedibd_window = 40.0
+params.refinedibd_optimize_params_json = ""
 
 params.hmmibd_n = 100
 params.hmmibd_m = 5
@@ -145,6 +148,15 @@ def mp_sets = [
 
 def sp_set_args_keys = sp_sets.collect{k, v -> v}[0].collect{k, v->k}
 def mp_set_args_keys = mp_sets.collect{k, v -> v}[0].collect{k, v->k}
+
+
+def read_param_lst_from_json(json_fn) {
+    assert json_fn != ""
+    def json_slurper = new JsonSlurper()
+    def f = file(json_fn)
+    def param_lst = json_slurper.parse(f)
+    return param_lst
+}
 
 
 process SIM_SP_CHR {
@@ -1323,7 +1335,7 @@ workflow OPTIMIZE_REFINEDIBD {
         .concat(SIM_UK_CHR.out.trees_vcf) // label, chrno, trees, vcf
 
     // 
-    ch_refinedibd_args = Channel.fromList([
+    def params_lst = [
         [lod: 8.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 20 , window: 40.0],
         [lod: 4.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 20 , window: 40.0],
         [lod: 3.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 20 , window: 40.0],
@@ -1353,10 +1365,14 @@ workflow OPTIMIZE_REFINEDIBD {
         [lod: 3.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 200, window: 40.0],
         [lod: 2.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 200, window: 40.0],
         [lod: 1.1, length:2.0, scale: Math.sqrt(1000/100) , minmac: 200, window: 40.0],
-    ]).map{args->
-        def arg_sp_dir = String.format("lod%f_len%f_scale%f_minmac%d_win%f", 
-            args.lod, args.length, args.scale, args.minmac, args.window
-        )
+    ]
+    if (params.refinedibd_optimize_params_json != "") {
+        params_lst = read_param_lst_from_json(params.refinedibd_optimize_params_json)
+        println("used params from json file ${params.refinedibd_optimize_params_json}")
+    }
+
+    ch_refinedibd_args = Channel.fromList(params_lst).map{args->
+        def arg_sp_dir = "lod${args.lod}_len${args.length}_scale${args.scale}_minmac${args.minmac}_win${args.window}"
         [args, arg_sp_dir]
     }
     if (params.test) {
