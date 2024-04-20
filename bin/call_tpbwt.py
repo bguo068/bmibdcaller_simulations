@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+import time
 import phasedibd
 import pandas as pd
 import numpy as np
@@ -36,7 +37,7 @@ parser.add_argument(
 parser.add_argument("--Lf", type=float, default=3.0, help="min IBD length in cM")
 parser.add_argument("--mem_gb", type=int, required=True)  # not used
 parser.add_argument("--nthreads", type=int, default=None)
-parser.add_argument("--minmac", type=int, default=1, help="min MAC")
+parser.add_argument("--minmaf", type=float, default=0.01)
 parser.add_argument("--use_phase_correction", type=int, default=1, choices=[0, 1])
 parser.add_argument("--genome_set_id", type=int, required=True)
 
@@ -51,13 +52,12 @@ nthreads = args.nthreads
 template_opt = args.template
 Lm = args.Lm
 Lf = args.Lf
-minmac = args.minmac
+minmaf = args.minmaf
 use_phase_correction = True if args.use_phase_correction == 1 else False
 
 # filter by minmac and
 # decompression vcf (required by phasedibd)
 nsam = len(allel.read_vcf_headers(vcf).samples)
-minmaf = minmac / nsam / 2
 subprocess.run(
     f"bcftools view -q {minmaf}:minor {vcf} > tmp.vcf", shell=True, check=True
 )

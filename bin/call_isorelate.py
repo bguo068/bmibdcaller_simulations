@@ -12,7 +12,7 @@ def get_args(cmd_args=None):
     parser.add_argument("--chrno", type=int, required=True)
     parser.add_argument("--min_snp", type=int, default=20)
     parser.add_argument("--min_len_bp", type=int, default=50000)
-    parser.add_argument("--minmac", type=int, required=True)
+    parser.add_argument("--minmaf", type=float, default=0.01)
     parser.add_argument("--imiss", type=float, required=True)
     parser.add_argument("--vmiss", type=float, required=True)
     parser.add_argument("--cpus", type=int, default=4)
@@ -31,7 +31,7 @@ min_len_bp = args.min_len_bp
 bp_per_cm = 0.01 / args.r
 seqlen_in_cm = args.seqlen / bp_per_cm
 # use `minmac` instead of `maf` to make it consistent across different IBD callers
-minmac = args.minmac
+minmaf = args.minmaf
 imiss = args.imiss
 vmiss = args.vmiss
 chrno = args.chrno
@@ -52,7 +52,7 @@ r_code = f"""
 ped <- read.delim("ped.ped", sep=' ', header=F)
 ped[, 5] <- 1
 nsample = nrow(ped)
-maf = {minmac} / 2.0 / nsample
+maf = {minmaf}
 map <- read.delim("ped.map", sep=' ', header=F)
 ped_map <- list(ped=ped, map=map)
 library(isoRelate)
@@ -86,8 +86,12 @@ write.table(my_ibd, "{ofn}", sep='\t', quote=F, row.names=F)
 """
 Path("run_isorelate.R").write_text(r_code)
 # ------- run R code to generate the ibd file
-cmd = ["Rscript", "run_isorelate.R"]
-assert run(cmd).returncode == 0
+cmd = ["/usr/bin/time", "Rscript", "run_isorelate.R"]
+res = run(cmd, text=True, capture_output=True)
+assert res.returncode == 0
+
+with open("time_output.txt", "w") as f:
+    f.write(res.stderr)
 
 # # ------------------- make genetic map ----------------------------
 with open(f"{chrno}.map", "w") as f:

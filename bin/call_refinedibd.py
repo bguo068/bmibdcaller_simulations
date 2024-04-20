@@ -19,11 +19,12 @@ parser.add_argument("--r", type=float, required=True)
 parser.add_argument("--seqlen", type=int, required=True)
 parser.add_argument("--chrno", type=int, required=True)
 parser.add_argument("--window", type=float, default=40.0)
+parser.add_argument("--trim", type=float, default=0.15)
 parser.add_argument("--lod", type=float, default=0.3)
 parser.add_argument("--length", type=float, default=2.0)
 parser.add_argument("--scale", type=float, default=0)
 parser.add_argument("--mem_gb", type=int, required=True)
-parser.add_argument("--minmac", type=int, default=1, help="min MAC")
+parser.add_argument("--minmaf", type=float, default=0.01)
 parser.add_argument("--nthreads", type=int, default=None)
 parser.add_argument("--genome_set_id", type=int, required=True)
 
@@ -37,14 +38,14 @@ window = args.window
 lod = args.lod
 length = args.length
 scale = args.scale
-minmac = args.minmac
+minmaf = args.minmaf
 mem_gb = args.mem_gb
 nthreads = args.nthreads
+trim = args.trim
 
 # filter by minmac and
 # decompression vcf (required by phasedibd)
 nsam = len(allel.read_vcf_headers(vcf).samples)
-minmaf = minmac / nsam / 2
 subprocess.run(
     f"bcftools view -q {minmaf}:minor {vcf} -Oz -o tmp.vcf.gz", shell=True, check=True
 )
@@ -61,9 +62,10 @@ with open(f"{chrno}.map", "w") as f:
 # ------------------- call hapibd ----------------------------------
 map_fn = f"{chrno}.map"
 cmd = (
+    "/usr/bin/time "
     f"java -Xss5M -Xmx{mem_gb}g -jar {refinedibd_jar} gt={vcf} map={map_fn}"
     f" nthreads={nthreads} out={chrno} chrom={chrno}"
-    f" lod={lod} window={window} scale={scale} length={length}"
+    f" lod={lod} window={window} trim={trim} scale={scale} length={length}"
 )
 print(cmd)
 res = subprocess.run(cmd.split(), text=True, capture_output=True)
@@ -74,6 +76,9 @@ if (
     or "ERROR" in res.stdout.capitalize()
 ):
     raise Exception(res.stderr + "\n" + res.stdout)
+
+with open("time_output.txt", "w") as f:
+    f.write(res.stderr)
 
 # ----------------- reformat refinedibd results (there are 9 columns) ---------------
 df_ibd = pd.read_csv(f"{chrno}.ibd.gz", sep="\t", header=None)
