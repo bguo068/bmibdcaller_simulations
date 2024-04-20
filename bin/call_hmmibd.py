@@ -21,6 +21,13 @@ def get_args():
     parser.add_argument("--minmaf", type=float, default=0.01)
     parser.add_argument("--mincm", type=float, default=2.0)
     parser.add_argument("--genome_set_id", type=int, required=True)
+    parser.add_argument("--num_threads", type=int, default=1)
+    parser.add_argument(
+        "--version", type=str, choices=["hmmIBD", "hmmibd2"], default="hmmIBD"
+    )
+    parser.add_argument(
+        "--optimize_for_large_size", type=int, choices=[0, 1], default=0
+    )
 
     return parser.parse_args()
 
@@ -69,8 +76,37 @@ df_hmm_inputs.to_csv("hmm_inputs.txt", sep="\t", index=None)
 
 # ------------------- run hmmibd  ----------------------------
 # cmd = f"hmmIBDr -i hmm_inputs.txt -o hmmibd_out -n {n} -m {m} -r {args.r}"
-cmd = f"hmmibd2 -i hmm_inputs.txt -o hmmibd_out -n {n} -m {m} -r {args.r}"
-run(cmd, shell=True)
+if args.version == "hmmIBD":
+    cmd = f"""
+        which hmmIBD > version.txt
+        /usr/bin/time \
+            hmmIBD -i hmm_inputs.txt -o hmmibd_out -n {n} -m {m} -r {args.r}"""
+else:
+    if args.optimize_for_large_size == 0:
+        cmd = f"""
+            which hmmibd2 > version.txt
+            /usr/bin/time \
+            hmmibd2 -i hmm_inputs.txt -o hmmibd_out -n {n} -m {m} -r {args.r} \
+                --num-threads {args.num_threads} \
+                --suppress-frac --buffer-size-segments 100000000
+        """
+    else:
+        cmd = f"""
+            which hmmibd2 > version.txt
+            /usr/bin/time \
+            hmmibd2 -i hmm_inputs.txt -o hmmibd_out -n {n} -m {m} -r {args.r} \
+                --num-threads {args.num_threads} \
+                --par-mode 1 --filt-min-seg-cm 2 --filt-ibd-only --par-chunk-size 50 --max-all 2 \
+                --suppress-frac --buffer-size-segments 100000000
+        """
+
+
+print(cmd)
+
+res = run(cmd, shell=True, text=True, capture_output=True)
+
+with open("time_output.txt", "w") as f:
+    f.write(res.stderr)
 
 
 df_ibd = pd.read_csv("hmmibd_out.hmm.txt", sep="\t")[lambda x: (x["different"] == 0)]
@@ -86,7 +122,11 @@ df_ibd["HasMutation"] = 0
 sel_cols = ["Id1", "Id2", "Start", "End", "Ancestor", "Tmrca", "HasMutation"]
 sel_rows = ((df_ibd.End - df_ibd.Start) / bp_per_cm) >= mincm
 
-ofn = f"{args.genome_set_id}_{chrno}_hmmibd.ibd"
+if args.version == "hmmIBD":
+    ofn = f"{args.genome_set_id}_{chrno}_hmmibd.ibd"
+else:
+    ofn = f"{args.genome_set_id}_{chrno}_hmmibdrs.ibd"
+
 df_ibd.loc[sel_rows, sel_cols].to_csv(ofn, sep="\t", index=None)
 
 # -------------------- write log (just for consistency with other ibd callers) -
