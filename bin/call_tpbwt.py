@@ -72,6 +72,10 @@ centimorgan = pos / bp_per_cm
 gmap = pd.DataFrame({"Chrom": chrom, "Id": ".", "cM": centimorgan, "Bp": pos})
 gmap.to_csv(f"{chrno}.map", sep=" ", index=None, header=None)
 
+# for more precise timing: start
+start_time = time.time()
+
+
 # haplotypes
 haplotypes = phasedibd.VcfHaplotypeAlignment(vcf, f"{chrno}.map")
 
@@ -93,6 +97,7 @@ else:
 ibd_results = tpbwt.compute_ibd(
     haplotypes, L_f=Lf, L_m=Lm, use_phase_correction=use_phase_correction
 )
+
 
 # check ids
 # tpbwt is using index not sample names
@@ -119,8 +124,13 @@ ibd_df = pd.DataFrame(
 )
 
 # write to file
-ofn = f"{args.genome_set_id}_{chrno}_tpbwtibd.ibd"
+ofn = f"{args.genome_set_id}_{chrno}_tpbwt.ibd"
 ibd_df.to_csv(ofn, sep="\t", header=True, index=None)
+
+with open("tmp_time_output.txt", "w") as f:
+    # for more precise timing: end
+    time_diff = time.time() - start_time
+    f.write(f"python time time_output: {time_diff} seconds\n")
 
 print(
     f"""
