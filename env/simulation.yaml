@@ -38,7 +38,8 @@ dependencies:
   - r-devtools=2.4.5      # required by isoRelate
   - pip:
     - tsdate==0.1.5
-    - ibdutils @ git+ssh://git@github.com/bguo068/ibdutils
+    - tomli_w==1.0.0
+    - ibdutils @ git+ssh://git@github.com/bguo068/ibdutils # commit: bf9d8cb0af2bfeb3510b3559c95c7477b2361498
 
 
   # NOTE: after install this conda environment, follow `./additional_setup.md`
