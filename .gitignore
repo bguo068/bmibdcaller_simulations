@@ -9,6 +9,7 @@ simulations/r240108/res*
 simulations/r240111_time_ram/res_*
 simulations/r240111_time_ram/*.json
 simulations/r240116/res
+bin/ibdutils
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
