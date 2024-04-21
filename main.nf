@@ -5,12 +5,12 @@ nextflow.enable.dsl=2
 params.test = false
 params.resdir = "res"
 
-params.min_mac = 20 // assuming homozyogous diploids, eg. min_maf 20 / 2 / 1000 = 0.01
+params.minmaf = 0.01 // assuming homozyogous diploids, eg. min_maf 0.01
 params.mincm = 2.0
 params.nchroms = 14
 
 params.tpbwt_template_opts = 1
-params.tpbwt_Lm = params.test ? 152: 100 // optimized
+params.tpbwt_Lm = 80 // update on 1/10 from 100 -> 80
 params.tpbwt_Lf = params.mincm
 params.tpbwt_use_phase_correction = 0
 
@@ -21,33 +21,43 @@ params.hapibd_maxgap = 1000
 params.hapibd_minmarkers = 70
 
 params.refinedibd_length = params.mincm
-params.refinedibd_lod = 1.1 // TODO: confirm what does lod mean
+params.refinedibd_lod = 1.6 // 1/9/24, update from 1.1 to 1.6
 params.refinedibd_scale = 0
 params.refinedibd_window = 40.0
+params.refinedibd_trim = 0.15 // in centigmorgans
 params.refinedibd_optimize_params_json = ""
 
 params.hmmibd_n = 100
 params.hmmibd_m = 5
+params.hmmibd_version = ["hmmIBD", "hmmibd2"][0]
 
 params.isorelate_imiss = 0.3
 params.isorelate_vmiss = 0.3
 params.isorelate_min_snp = 20 // optimized
-params.isorelate_min_mac = 200 // 0.1, which is different from other callers
+params.isorelate_minmaf = 0.1 // 0.1, which is different from other callers
 
 // params.tsinferibd_max_tmrca = [1000, 3000]
 
-params.filt_ibd_by_ov = false
+params.filt_ibd_by_ov = true // update 1/9/24 false->true
+params.peak_validate_meth = 'ihs' // 'xirs' or 'ihs'
+params.ibdne_no_diploid_convertion = "true"
 params.ibdne_mincm = params.mincm
 params.ibdne_minregion = 10
 params.ibdne_flatmeth = ["none", "keep_hap_1_only", "merge"][0]
 
 params.ifm_transform = ["square", "cube", "none"][0]
 params.ifm_ntrials = 1000
-params.ifm_mincm = 2.0
+// params.ifm_mincm = 2.0
 params.ifm_mingwcm = 5.0
+
+params.csp_json = "" // a normal string for single json; a string with wildcard for multiple json files
+params.sp_sets_json = "" // a normal string for single json
+params.mp_sets_json = "" // a normal string for single json
 
 
 params.meta = "" // empty for simulation
+
+params.compute_bench_large_size = [0, 1][0]
 
 // helper function to split string with ','
 def to_lst(value){
@@ -110,18 +120,18 @@ def get_maxtmrca(p){
 
 def sp_sets = [
     sp_neu: sp_defaults + [s: 0.0, genome_set_id: 10000],
-    sp_s01: sp_defaults + [s: 0.1, genome_set_id: 10001],
-    sp_s02: sp_defaults + [s: 0.2, genome_set_id: 10002],
-    sp_s03: sp_defaults + [s: 0.3, genome_set_id: 10003],
-    sp_g040:sp_defaults + [g_sel_start: 40, genome_set_id: 10004],
-    sp_g080:sp_defaults + [g_sel_start: 80, genome_set_id: 10005],
-    sp_g120:sp_defaults + [g_sel_start:120, genome_set_id: 10006],
-    sp_o01: sp_defaults + [num_origins: 1, genome_set_id: 10007],
-    sp_o03: sp_defaults + [num_origins: 3, genome_set_id: 10008],
-    sp_o27: sp_defaults + [num_origins: 27, genome_set_id: 10009],
-    sp_rel: sp_defaults + [sim_relatedness: 1, genome_set_id: 30000],
-    sp_const: sp_defaults + [s: 0.0, N0: 10000, genome_set_id: 30005],
-    sp_grow: sp_defaults +  [s: 0.0,  N0: 100000, genome_set_id: 30006],
+    // sp_s01: sp_defaults + [s: 0.1, genome_set_id: 10001],
+    // sp_s02: sp_defaults + [s: 0.2, genome_set_id: 10002],
+    // sp_s03: sp_defaults + [s: 0.3, genome_set_id: 10003],
+    // sp_g040:sp_defaults + [g_sel_start: 40, genome_set_id: 10004],
+    // sp_g080:sp_defaults + [g_sel_start: 80, genome_set_id: 10005],
+    // sp_g120:sp_defaults + [g_sel_start:120, genome_set_id: 10006],
+    // sp_o01: sp_defaults + [num_origins: 1, genome_set_id: 10007],
+    // sp_o03: sp_defaults + [num_origins: 3, genome_set_id: 10008],
+    // sp_o27: sp_defaults + [num_origins: 27, genome_set_id: 10009],
+    // sp_rel: sp_defaults + [sim_relatedness: 1, genome_set_id: 30000],
+    // sp_const: sp_defaults + [s: 0.0, N0: 10000, genome_set_id: 30005],
+    // sp_grow: sp_defaults +  [s: 0.0,  N0: 100000, genome_set_id: 30006],
     // sp_r0003: sp_defaults + [r: 3e-9,     s:0.0,  seqlen: (1.0/3e-9).toInteger(),     genome_set_id: 40001],
     // sp_r0010: sp_defaults + [r: 1e-8,     s:0.0,  seqlen: (1.0/1e-8).toInteger(),     genome_set_id: 40002],
     // sp_r0030: sp_defaults + [r: 3e-8,     s:0.0,  seqlen: (1.0/3e-8).toInteger(),     genome_set_id: 40003],
@@ -133,10 +143,10 @@ def sp_sets = [
 
 def mp_sets = [
     mp_s00: mp_defaults + [s:0.0, genome_set_id: 20000],
-    mp_s01: mp_defaults + [s:0.1, genome_set_id: 20001],
-    mp_s02: mp_defaults + [s:0.2, genome_set_id: 20002],
-    mp_s03: mp_defaults + [s:0.3, genome_set_id: 20003],
-    mp_rel: mp_defaults + [sim_relatedness: 1, genome_set_id: 30001],
+    // mp_s01: mp_defaults + [s:0.1, genome_set_id: 20001],
+    // mp_s02: mp_defaults + [s:0.2, genome_set_id: 20002],
+    // mp_s03: mp_defaults + [s:0.3, genome_set_id: 20003],
+    // mp_rel: mp_defaults + [sim_relatedness: 1, genome_set_id: 30001],
     // mp_r0003: mp_defaults + [r: 3e-9,     s:0.0, seqlen: (1.0/3e-9).toInteger(),     genome_set_id: 50001],
     // mp_r0010: mp_defaults + [r: 1e-8,     s:0.0, seqlen: (1.0/1e-8).toInteger(),     genome_set_id: 50002],
     // mp_r0030: mp_defaults + [r: 3e-8,     s:0.0, seqlen: (1.0/3e-8).toInteger(),     genome_set_id: 50003],
@@ -146,17 +156,23 @@ def mp_sets = [
     // mp_r1000: mp_defaults + [r: 1e-6,     s:0.0, seqlen: (1.0/1e-6).toInteger(),     genome_set_id: 50007],
 ]
 
-def sp_set_args_keys = sp_sets.collect{k, v -> v}[0].collect{k, v->k}
-def mp_set_args_keys = mp_sets.collect{k, v -> v}[0].collect{k, v->k}
 
-
-def read_param_lst_from_json(json_fn) {
+def read_param_from_json(json_fn) {
     assert json_fn != ""
     def json_slurper = new JsonSlurper()
     def f = file(json_fn)
-    def param_lst = json_slurper.parse(f)
-    return param_lst
+    def params = json_slurper.parse(f)
+    return params
 }
+
+if ( params.sp_sets_json != ""){
+    sp_sets = read_param_from_json(params.sp_sets_json)
+}
+
+if ( params.mp_sets_json != ""){
+    mp_sets = read_param_from_json(params.mp_sets_json)
+}
+
 
 
 process SIM_SP_CHR {
@@ -238,77 +254,17 @@ process SIM_MP_CHR {
     """
 }
 
-process CALL_IBD_TSINFERIBD {
-    tag  "${args.genome_set_id}_${chrno}_tsinferibd"
-    publishDir "${resdir}/${label}/ibd/tsinferibd/", \
-        mode: "symlink", pattern: "*_tsinferibd.ibd"
-    input:
-    tuple val(label), val(chrno), val(args), path(vcf), path(true_ne_df)
-    output:
-    tuple val(label), val(chrno), path("*_tsinferibd.ibd"), emit: ibd
-    tuple val(label), val(chrno), path("*_tsinferibd.ibd_maxtmrca_*"), emit: ibd_extra
-    tuple val(label), val(chrno), path("*_tsinfer.trees"), emit: trees
-    script:
-    def cmd_options_tsinfer = [
-        vcf_files: vcf,
-        r: args.r,
-        u: args.u,
-        ne: true_ne_df ?: mp_ne(args),
-    ].collect{k,v -> "--${k} $v"}.join(" ")
-    // Note passing [] to true_ne signals multiple-pop simulation.
-    // A Ne value is caluated from simulation args, see function `mp_ne`
-    // defined above the process definitions
-    def max_tmrmca_str =  params.tsinferibd_max_tmrca.join(" ")
-    def cmd_options_tskibd = [
-        tree: "${chrno}.trees",
-        chrno: chrno,
-        r: args.r,
-        seqlen: args.seqlen,
-        mincm: params.mincm,
-        genome_set_id: args.genome_set_id,
-        max_tmrca: max_tmrmca_str
-    ].collect{k,v -> "--${k} $v"}.join(" ")
-    def prefix = "${args.genome_set_id}_${chrno}"
-    // first infer trees, then call IBD from inferred trees
-    """
-    tsinfer_tsdate_gw.py ${cmd_options_tsinfer} # output ${chrno}.trees
-    call_tskibd.py ${cmd_options_tskibd}
-
-    mv ${chrno}.trees ${prefix}_tsinfer.trees
-    mv ${prefix}_tskibd.ibd ${prefix}_tsinferibd.ibd
-
-    # extra files
-    if [ -n "${max_tmrmca_str}" ] ; then
-        for tmrca in ${max_tmrmca_str}; do
-            mv ${prefix}_tskibd.ibd_maxtmrca_\${tmrca} \
-                ${prefix}_tsinferibd.ibd_maxtmrca_\${tmrca}
-        done
-    fi
-    """
-
-    stub:
-    def max_tmrmca_str =  params.tsinferibd_max_tmrca.join(" ")
-    def prefix = "${args.genome_set_id}_${chrno}"
-    """touch  ${prefix}_tsinferibd.ibd ${prefix}_tsinfer.trees
-
-    # extra files
-    if [ -n "${max_tmrmca_str}" ] ; then
-        for tmrca in ${max_tmrmca_str}; do
-            touch  ${prefix}_tsinferibd.ibd_maxtmrca_\${tmrca}
-        done
-    fi
-
-    """
-}
-
 process CALL_IBD_HAPIBD {
     tag "${args.genome_set_id}_${chrno}_hapibd"
-    publishDir "${resdir}/${label}/ibd/hapibd/", \
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibd/hapibd/", \
         mode: "symlink", pattern: "*_hapibd.ibd"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibdcalltime/hapibd/${chrno}/", \
+        mode: "symlink", pattern: "time_output.txt"
     input:
     tuple val(label), val(chrno), val(args), path(vcf)
     output:
-    tuple val(label), val(chrno), path("*_hapibd.ibd")
+    tuple val(label), val(chrno), path("*_hapibd.ibd"), emit: ibd
+    tuple val(label), val(chrno), path("time_output.txt"), emit: time
     script:
     def cmd_options = [
         vcf: vcf,
@@ -320,7 +276,7 @@ process CALL_IBD_HAPIBD {
         maxgap: params.hapibd_maxgap,
         minextend: params.hapibd_minextend,
         minmarkers: params.hapibd_minmarkers,
-        minmac: params.min_mac,
+        minmaf: params.minmaf,
         mem_gb: task.memory.giga,
         nthreads: task.cpus,
         genome_set_id: args.genome_set_id,
@@ -330,17 +286,21 @@ process CALL_IBD_HAPIBD {
     """
 
     stub:
-    """touch ${args.genome_set_id}_${chrno}_hapibd.ibd"""
+    """touch ${args.genome_set_id}_${chrno}_hapibd.ibd time_output.txt"""
 }
 
 process CALL_IBD_TSKIBD {
     tag "${args.genome_set_id}_${chrno}_tskibd"
-    publishDir "${resdir}/${label}/ibd/tskibd/", \
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibd/tskibd/", \
         mode: "symlink", pattern: "*_tskibd.ibd"
+    // publishDir "${resdir}/${args.genome_set_id}_${label}/ibdcalltime/tskibd/", \
+    //     mode: "symlink", pattern: "time_output.txt"
+
     input:
     tuple val (label), val(chrno), val(args), path(trees)
     output:
-    tuple val(label), val(chrno), path("*_tskibd.ibd")
+    tuple val(label), val(chrno), path("*_tskibd.ibd"), emit: ibd
+    // tuple val(label), val(chrno), path("time_output.txt"), emit: time
     script:
     def cmd_options_tskibd = [
         tree: trees,
@@ -356,16 +316,19 @@ process CALL_IBD_TSKIBD {
     """
     stub:
     def prefix = "${args.genome_set_id}_${chrno}"
-    """touch  ${prefix}_tskibd.ibd"""
+    """touch  ${prefix}_tskibd.ibd time_output.txt"""
 }
 process CALL_IBD_REFINEDIBD {
     tag "${args.genome_set_id}_${chrno}_refinedibd"
-    publishDir "${resdir}/${label}/ibd/refinedibd/", \
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibd/refinedibd/", \
         mode: "symlink", pattern: "*_refinedibd.ibd"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibdcalltime/refinedibd/${chrno}/", \
+        mode: "symlink", pattern: "time_output.txt"
     input:
     tuple val(label), val(chrno), val(args), path(vcf)
     output:
-    tuple val(label), val(chrno), path("*_refinedibd.ibd")
+    tuple val(label), val(chrno), path("*_refinedibd.ibd"), emit: ibd
+    tuple val(label), val(chrno), path("time_output.txt"), emit: time
     script:
     def cmd_options = [
         vcf: vcf,
@@ -376,8 +339,9 @@ process CALL_IBD_REFINEDIBD {
         length: params.refinedibd_length,
         scale: params.refinedibd_scale,
         mem_gb: task.memory.giga,
-        minmac: params.min_mac,
+        minmaf: params.minmaf,
         window: params.refinedibd_window,
+        trim: params.refinedibd_trim,
         nthreads: task.cpus,
         genome_set_id: args.genome_set_id,
     ].collect{k, v -> "--${k} ${v}"}.join(" ")
@@ -385,17 +349,20 @@ process CALL_IBD_REFINEDIBD {
     call_refinedibd.py ${cmd_options}
     """
     stub:
-    """touch ${args.genome_set_id}_${chrno}_refinedibd.ibd"""
+    """touch ${args.genome_set_id}_${chrno}_refinedibd.ibd time_output.txt"""
 }
 
 process CALL_IBD_TPBWT {
-    tag "${args.genome_set_id}_${chrno}_tpbwtibd"
-    publishDir "${resdir}/${label}/ibd/tpbwtibd/", \
-        mode: "symlink", pattern: "*_tpbwtibd.ibd"
+    tag "${args.genome_set_id}_${chrno}_tpbwt"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibd/tpbwt/", \
+        mode: "symlink", pattern: "*_tpbwt.ibd"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibdcalltime/tpbwt/${chrno}/", \
+        mode: "symlink", pattern: "time_output.txt"
     input:
     tuple val(label), val(chrno), val(args), path(vcf)
     output:
-    tuple val(label), val(chrno), path("*_tpbwtibd.ibd")
+    tuple val(label), val(chrno), path("*_tpbwt.ibd"), emit: ibd
+    tuple val(label), val(chrno), path("time_output.txt"), emit: time
     script:
     def cmd_options = [
         vcf: vcf,
@@ -404,7 +371,7 @@ process CALL_IBD_TPBWT {
         chrno: chrno,
         template: params.tpbwt_template_opts, 
         use_phase_correction: params.tpbwt_use_phase_correction,
-        minmac: params.min_mac,
+        minmaf: params.minmaf,
         Lm: params.tpbwt_Lm,
         Lf: params.tpbwt_Lf,
         mem_gb: task.memory.giga,
@@ -412,20 +379,25 @@ process CALL_IBD_TPBWT {
         genome_set_id: args.genome_set_id,
     ].collect{k, v -> "--${k} ${v}"}.join(" ")
     """
-    call_tpbwt.py ${cmd_options}
+    /usr/bin/time \
+    call_tpbwt.py ${cmd_options} 2>time_output.txt
+    cat tmp_time_output.txt >> time_output.tx
     """
     stub:
-    """touch ${args.genome_set_id}_${chrno}_tpbwtibd.ibd"""
+    """touch ${args.genome_set_id}_${chrno}_tpbwt.ibd"""
 }
 
 process CALL_IBD_HMMIBD {
     tag "${args.genome_set_id}_${chrno}_hmmibd"
-    publishDir "${resdir}/${label}/ibd/hmmibd/", \
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibd/hmmibd/", \
         mode: "symlink", pattern: "*_hmmibd.ibd"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibdcalltime/hmmibd/${chrno}/", \
+        mode: "symlink", pattern: "time_output.txt"
     input:
     tuple val(label), val(chrno), val(args), path(vcf)
     output:
-    tuple val(label), val(chrno), path("*_hmmibd.ibd")
+    tuple val(label), val(chrno), path("*_hmmibd.ibd"), emit: ibd
+    tuple val(label), val(chrno), path("time_output.txt"), emit: time
     script:
     def cmd_options = [
         vcf: vcf,
@@ -435,25 +407,66 @@ process CALL_IBD_HMMIBD {
         n: params.hmmibd_n,
         m: params.hmmibd_m,
         mincm: params.mincm,
-        minmac: params.min_mac,
+        minmaf: params.minmaf,
         genome_set_id: args.genome_set_id,
+        num_threads: task.cpus,
+        version: params.hmmibd_version,
     ].collect{k, v -> "--${k} ${v}"}.join(" ")
     script:
         """
         call_hmmibd.py ${cmd_options}
         """
     stub:
-    """touch ${args.genome_set_id}_${chrno}_hmmibd.ibd"""
+    """touch ${args.genome_set_id}_${chrno}_hmmibd.ibd time_output.txt"""
+}
+
+// same as above except that in this version version is always hmmibd2(hmmibdrs) 
+process CALL_IBD_HMMIBDRS {
+    tag "${args.genome_set_id}_${chrno}_hmmibdrs"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibd/hmmibdrs/", \
+        mode: "symlink", pattern: "*_hmmibdrs.ibd"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibdcalltime/hmmibdrs/${chrno}/", \
+        mode: "symlink", pattern: "time_output.txt"
+    input:
+    tuple val(label), val(chrno), val(args), path(vcf)
+    output:
+    tuple val(label), val(chrno), path("*_hmmibdrs.ibd"), emit: ibd
+    tuple val(label), val(chrno), path("time_output.txt"), emit: time
+    script:
+    def cmd_options = [
+        vcf: vcf,
+        r: args.r,
+        seqlen: args.seqlen,
+        chrno: chrno,
+        n: params.hmmibd_n,
+        m: params.hmmibd_m,
+        mincm: params.mincm,
+        minmaf: params.minmaf,
+        genome_set_id: args.genome_set_id,
+        num_threads: task.cpus,
+        version: "hmmibd2",
+        optimize_for_large_size: args.optimize_for_large_size ?: 0,
+    ].collect{k, v -> "--${k} ${v}"}.join(" ")
+    script:
+        """
+        call_hmmibd.py ${cmd_options}
+        """
+    stub:
+    """touch ${args.genome_set_id}_${chrno}_hmmibdrs.ibd time_output.txt"""
 }
 
 process CALL_IBD_ISORELATE {
     tag "${args.genome_set_id}_${chrno}_isorelate"
-    publishDir "${resdir}/${label}/ibd/isorelate/", \
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibd/isorelate/", \
         mode: "symlink", pattern: "*_isorelate.ibd"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibdcalltime/isorelate/${chrno}/", \
+        mode: "symlink", pattern: "time_output.txt"
+
     input:
     tuple val(label), val(chrno), val(args), path(vcf)
     output:
-    tuple val(label), val(chrno), path("*_isorelate.ibd")
+    tuple val(label), val(chrno), path("*_isorelate.ibd"), emit: ibd
+    tuple val(label), val(chrno), path("time_output.txt"), emit: time
     script:
     def cmd_options = [
         vcf: vcf,
@@ -462,7 +475,7 @@ process CALL_IBD_ISORELATE {
         chrno: chrno,
         min_snp: params.isorelate_min_snp,
         min_len_bp: Math.round(params.mincm * (0.01/args.r)),
-        minmac: params.min_mac,
+        minmaf: params.isorelate_minmaf,
         imiss: params.isorelate_imiss,
         vmiss: params.isorelate_vmiss,
         cpus: task.cpus,
@@ -472,39 +485,9 @@ process CALL_IBD_ISORELATE {
     call_isorelate.py ${cmd_options}
     """
     stub:
-    """touch ${args.genome_set_id}_${chrno}_isorelate.ibd"""
+    """touch ${args.genome_set_id}_${chrno}_isorelate.ibd time_output.txt"""
 }
 
-process CMP_TRUE_AND_INFERRED_IBD {
-    tag "${args.genome_set_id}_${ibdcaller}_cmpibd"
-    publishDir "${resdir}/${label}/ibdcmp/", \
-        mode: "symlink", pattern: "*ibdcmpobj.gz"
-
-    input:
-    tuple val(label), val(ibdcaller), path(inferred_ibd_lst), \
-          path(true_ibd_lst, stageAs: "trueibd??.ibd"), val(args)
-    output:
-    tuple val(label), val(ibdcaller), path("*.ibdcmpobj.gz")
-
-    script:
-    def cmd_options = [
-        true_ibd_lst: true_ibd_lst,
-        inferred_ibd_lst: inferred_ibd_lst,
-        r: args.r,
-        seqlen: args.seqlen,
-        nchroms: params.nchroms,
-        ibdcaller: ibdcaller,
-        genome_set_id: args.genome_set_id,
-    ].collect{k, v -> "--${k} ${v}"}.join(" ")
-
-    """
-    cmp_ibd.py ${cmd_options}
-    """
-    stub:
-    """
-    touch ${args.genome_set_id}_${ibdcaller}.ibdcmpobj.gz
-    """
-}
 
 process PROC_DIST_NE {
     tag "${genome_set_id}"
@@ -542,6 +525,8 @@ process PROC_DIST_NE {
         ibdne_minregion: params.ibdne_minregion,
         ibdne_jar: ibdne_jar,
         ibdne_flatmeth: params.ibdne_flatmeth,
+        ibdne_flatmeth: params.ibdne_flatmeth,
+        ibdne_no_diploid_conversion: params.ibdne_no_diploid_convertion,
     ]).collect{k, v-> "--${k} ${v}"}.join(" ")
     """
     proc_dist_ne.py ${args_local} 
@@ -576,6 +561,7 @@ process PROC_INFOMAP {
         ibd_files: "${ibd_lst}", // path is a blank separate list
         vcf_files: "${vcf_lst}", // path is a blank separate list
         genome_set_id: genome_set_id,
+        peak_validate_meth: params.peak_validate_meth,
     ].collect{k, v-> "--${k} ${v}"}.join(" ")
     """
     proc_infomap.py ${args_local}
@@ -636,11 +622,14 @@ process RUN_INFOMAP {
 }
 
 
+
 workflow WF_SP {
 
     main:
 
     // *********************** Log Params *************************
+    def sp_set_args_keys = sp_sets.collect{k, v -> v}[0].collect{k, v->k}
+
     ch_sp_sets = Channel.fromList(sp_sets.collect {label, args->[label, args]})
     if(params.test) { ch_sp_sets = ch_sp_sets.take(1) }
 
@@ -689,12 +678,12 @@ workflow WF_SP {
     CALL_IBD_ISORELATE(ch_in_ibdcall_vcf)
 
     // collect IBD and groupby simulation label and ibdcaller
-    ch_out_ibd_grp = CALL_IBD_HAPIBD.out.map{it + ["hapibd"]}
-            .concat( CALL_IBD_TSKIBD.out.map{it + ["tskibd"]})
-            .concat(CALL_IBD_REFINEDIBD.out.map{it+ ["refinedibd"]})
-            .concat(CALL_IBD_TPBWT.out.map{it + ["tpbwt"]})
-            .concat(CALL_IBD_HMMIBD.out.map{it + ["hmmibd"]})
-            .concat(CALL_IBD_ISORELATE.out.map{it+["isorelate"]})
+    ch_out_ibd_grp = CALL_IBD_HAPIBD.out.ibd.map{it + ["hapibd"]}
+            .concat( CALL_IBD_TSKIBD.out.ibd.map{it + ["tskibd"]})
+            .concat(CALL_IBD_REFINEDIBD.out.ibd.map{it+ ["refinedibd"]})
+            .concat(CALL_IBD_TPBWT.out.ibd.map{it + ["tpbwt"]})
+            .concat(CALL_IBD_HMMIBD.out.ibd.map{it + ["hmmibd"]})
+            .concat(CALL_IBD_ISORELATE.ibd.out.map{it+["isorelate"]})
             // [label, chrno, ibd, ibdcaller]
         .map{label, chrno, ibd, ibdcaller ->
             def key =  groupKey([label, ibdcaller], params.nchroms)
@@ -709,7 +698,7 @@ workflow WF_SP {
         }
     // ch_out_ibd_grp.map{it-> [it[0], it[1], it[2].size()]}.view()
 
-    ch_true_ibd = CALL_IBD_TSKIBD.out // [label, chrno, ibd]
+    ch_true_ibd = CALL_IBD_TSKIBD.out.ibd // [label, chrno, ibd]
         .map{label, chrno, ibd-> [groupKey(label, params.nchroms), [chrno, ibd]]}
         .groupTuple(by: 0, sort: {a, b-> a[0]<=>b[0]})  // groupby label, sort by chrno
         .map{key, data_lst -> 
@@ -718,6 +707,7 @@ workflow WF_SP {
             [label, ibd_files_true]
         }
 
+
     ch_out_ibd_grp = ch_out_ibd_grp
         // combine with true ibd list
         .combine(ch_true_ibd, by: 0)
@@ -725,6 +715,7 @@ workflow WF_SP {
             // fix name collision for tskibd as true and inferrre ibd are the same
             [label, ibdcaller, ibd_lst, ibdcaller=="tskibd" ? [] : ibd_list_true]
          }
+
 
     ch_out_vcf_grp = SIM_SP_CHR.out.trees_vcf
         .map{label, chrno, _trees, vcf -> 
@@ -770,6 +761,20 @@ workflow WF_SP {
 
     RUN_IBDNE(ch_in_ibdne)
 
+
+    //  ******************** CMP IBD ********************************
+
+    ch_for_cmp_ibd = ch_out_ibd_grp  
+        .filter{ label, ibdcaller, ibd_lst, ibd_list_true -> ibdcaller != "tskibd" }
+        .map {label, ibdcaller, ibd_lst, ibd_list_true ->
+            def args = sp_sets[label]
+            def csp_id = "no_cspid"
+            [label, args, ibdcaller, csp_id, ibd_list_true, ibd_lst]
+        }
+
+    CMP_IBD(ch_for_cmp_ibd)
+
+
     emit: 
 
     ch_ibdobj_dist = PROC_DIST_NE.out.ibddist_ibd_obj
@@ -784,6 +789,8 @@ workflow WF_MP {
     main:
 
     // *********************** Log params ************************
+    def mp_set_args_keys = mp_sets.collect{k, v -> v}[0].collect{k, v->k}
+
     ch_mp_sets = Channel.fromList(mp_sets.collect {label, args->[label, args]})
     if(params.test) { ch_mp_sets = ch_mp_sets.take(1) }
 
@@ -836,12 +843,12 @@ workflow WF_MP {
     CALL_IBD_ISORELATE(ch_in_ibdcall_vcf)
 
     // collect IBD and groupby simulation label and ibdcaller
-    ch_out_ibd_grp = CALL_IBD_HAPIBD.out.map{it + ["hapibd"]}
-            .concat( CALL_IBD_TSKIBD.out.map{it + ["tskibd"]})
-            .concat(CALL_IBD_REFINEDIBD.out.map{it+ ["refinedibd"]})
-            .concat(CALL_IBD_TPBWT.out.map{it + ["tpbwt"]})
-            .concat(CALL_IBD_HMMIBD.out.map{it + ["hmmibd"]})
-            .concat(CALL_IBD_ISORELATE.out.map{it+["isorelate"]})
+    ch_out_ibd_grp = CALL_IBD_HAPIBD.out.ibd.map{it + ["hapibd"]}
+            .concat( CALL_IBD_TSKIBD.out.ibd.map{it + ["tskibd"]})
+            .concat(CALL_IBD_REFINEDIBD.out.ibd.map{it+ ["refinedibd"]})
+            .concat(CALL_IBD_TPBWT.out.ibd.map{it + ["tpbwt"]})
+            .concat(CALL_IBD_HMMIBD.out.ibd.map{it + ["hmmibd"]})
+            .concat(CALL_IBD_ISORELATE.out.ibd.map{it+["isorelate"]})
             // [label, chrno, ibd, ibdcaller]
         .map{label, chrno, ibd, ibdcaller ->
             def key =  groupKey([label, ibdcaller], params.nchroms)
@@ -894,6 +901,29 @@ workflow WF_MP {
     RUN_INFOMAP(ch_in_run_infomap)
 
 
+    // ********************** CMP IBD ***************************
+    ch_true_ibd = CALL_IBD_TSKIBD.out.ibd // [label, chrno, ibd]
+        .map{label, chrno, ibd-> [groupKey(label, params.nchroms), [chrno, ibd]]}
+        .groupTuple(by: 0, sort: {a, b-> a[0]<=>b[0]})  // groupby label, sort by chrno
+        .map{key, data_lst -> 
+            def label = key.toString()
+            def ibd_files_true = data_lst.collect{v -> v[1]}
+            [label, ibd_files_true]
+        }
+
+    ch_for_cmp_ibd = ch_out_ibd_grp  //[label, ibdcaller, ibd_lst]
+        // combine with true ibd list
+        .combine(ch_true_ibd, by: 0) // [label, ibd_files_true]
+        .filter{label, ibdcaller, ibd_lst, ibd_list_true-> ibdcaller != "tskibd"}
+        .map{label, ibdcaller, ibd_lst, ibd_list_true-> 
+            def args = mp_sets[label]
+            def csp_id = "no_cspid"
+            [label, args, ibdcaller, csp_id, ibd_list_true, ibd_lst]
+        }
+
+     CMP_IBD(ch_for_cmp_ibd)
+
+
     emit:
 
     ch_ifm = RUN_INFOMAP.out
@@ -901,12 +931,8 @@ workflow WF_MP {
 
 }
 
-workflow WF_SUMMARY {
-    
-}
 
 workflow {
-
     WF_SP()
     WF_MP()
 }
@@ -956,15 +982,17 @@ process SIM_UK_CHR {
 
 process CALL_IBD_HAPIBD_PARAM {
     tag "${args.genome_set_id}_${chrno}_hapibd"
-    publishDir "${resdir}/${label}/ibd/hapibd/${arg_sp_dir}", \
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibd/hapibd/${csp_id}", \
         mode: "symlink", pattern: "*_hapibd.ibd"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibdcalltime/hapibd/${csp_id}", \
+        mode: "symlink", pattern: "time_output.txt"
     input:
-    tuple val(label), val(chrno), val(args), path(vcf), val(hapibd_args), val(arg_sp_dir)
+    tuple val(label), val(chrno), val(args), path(vcf), val(caller), val(csp_id), val(hapibd_args)
     output:
-    tuple val(label), val(chrno), path("*_hapibd.ibd"), val(hapibd_args)
+    tuple val(label), val(chrno), val(caller), val(csp_id), path("*_hapibd.ibd")
     script:
         // call args is a dict with keys as follows
-        // minmac: params.min_mac,
+        // minmaf: params.minmaf,
         // minseed: params.hapibd_minseed,
         // minoutput: params.hapibd_minoutput,
         // maxgap: params.hapibd_maxgap,
@@ -984,149 +1012,25 @@ process CALL_IBD_HAPIBD_PARAM {
     """
     stub:
     def ibd_dir = String.format("%d", hapibd_args.minseed)
-    """touch ${args.genome_set_id}_${chrno}_hapibd.ibd"""
-}
-
-workflow OPTIMIZE_HAPIBD {
-    // single population model
-    // only simulating neutral situation
-    ch_sp_sets = Channel.fromList(sp_sets.collect {label, args->[label, args]})
-    .filter{label, args -> label == 'sp_neu'}
-
-    // multiple population model
-    ch_mp_sets = Channel.fromList(mp_sets.collect {label, args->[label, args]})
-    .filter{label, args -> label == 'mp_s00'}
-
-    // UK model with human or Pf recombination rates
-    ch_uk_sets = Channel.fromList( [
-        // all demographic parameters are hard-coded in the slim script
-        ["uk_gc0", [seqlen: 60_000_000, gc:0, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60001]],
-        ["uk_gc1", [seqlen: 60_000_000, gc:1, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60002]],
-        // the following two lines are models that using UK demograhic patterns but Pf recombination rate
-        ["uk_gc0_pf", [seqlen: 900_000, gc:0, r: 6.6666667e-7, u: 1e-8, nsam: 1000, genome_set_id: 60003]],
-        ["uk_gc1_pf", [seqlen: 900_000, gc:1, r: 6.6666667e-7, u: 1e-8, nsam: 1000, genome_set_id: 60004]],
-    ])
-
-
-    // combine with chrnos 
-    ch_chrs = Channel.fromList(1..(params.nchroms))
-
-    // reorder fields
-    ch_sp_input = ch_sp_sets // label, dict (args)
-        .combine( ch_chrs )
-        .map {label, args, chrno -> [label, chrno, args]}
-
-    ch_mp_input = ch_mp_sets // label, dict (args)
-        .combine( ch_chrs )
-        .map {label, args, chrno -> [label, chrno, args]}
-
-    ch_uk_input = ch_uk_sets // label, dict (args)
-        .combine( ch_chrs )
-        .map {label, args, chrno -> [label, chrno, args]}
-
-    // run simulations
-    SIM_SP_CHR(ch_sp_input)
-    SIM_MP_CHR(ch_mp_input)
-    SIM_UK_CHR(ch_uk_input)
-
-    // prepare ibdcaller input
-    ch_trees_vcf = SIM_SP_CHR.out.trees_vcf
-        .concat(SIM_MP_CHR.out.trees_vcf) // label, chrno, trees, vcf
-        .concat(SIM_UK_CHR.out.trees_vcf) // label, chrno, trees, vcf
-
-    // 
-    ch_hapibd_args = Channel.fromList([
-        // add minmac 20 (maf>=0.01) default is 2 which would include too many rare variants
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers: 100, minmac:20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  90, minmac:20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  80, minmac:20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  70, minmac:20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  60, minmac:20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  50, minmac:20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  40, minmac:20],
-        // [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  30, minmac:20],
-
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers: 100, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  30, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  10, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:   3, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers: 100, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  30, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  10, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:   3, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers: 100, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  30, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  10, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:   3, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers: 100, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  30, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  10, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:   3, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers: 100, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  30, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  10, minmac: 20],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:   3, minmac: 20],
-
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers: 100, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  30, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:  10, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers:   3, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers: 100, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  30, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:  10, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  300,  minmarkers:   3, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers: 100, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  30, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:  10, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:  100,  minmarkers:   3, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers: 100, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  30, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:  10, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:   30,  minmarkers:   3, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers: 100, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  30, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:  10, minmac: 200],
-        [minseed: 2, minoutput: 2, minextend: 1, maxgap:    3,  minmarkers:   3, minmac: 200],
-    ]).map{args->
-        def arg_sp_dir = String.format("ms%d_mo%d_me%d_mg%04d_mm%03d_mac%03d", 
-            args.minseed, args.minoutput, args.minextend, args.maxgap, args.minmarkers, args.minmac
-        )
-        [args, arg_sp_dir]
-    }
-    if (params.test) {
-        ch_hapibd_args = ch_hapibd_args.take(1)
-    }
-
-    ch_in_ibdcall_trees = ch_trees_vcf
-        .combine(ch_sp_sets.concat(ch_mp_sets).concat(ch_uk_sets), by:0)
-        .map{label, chrno, trees, vcf, args -> [label, chrno, args, trees] }
-
-    ch_in_ibdcall_vcf = ch_trees_vcf
-        .combine(ch_sp_sets.concat(ch_mp_sets).concat(ch_uk_sets), by:0)
-        .map{label, chrno, trees, vcf, args -> [label, chrno, args, vcf] }
-    
-    ch_in_ibdcall_vcf_with_params = ch_in_ibdcall_vcf 
-        .combine(ch_hapibd_args) // label, chrno, args, vcf, hapibd_args, arg_sp_dir
-
-    // call hmmibd
-    CALL_IBD_TSKIBD(ch_in_ibdcall_trees)
-    CALL_IBD_HAPIBD_PARAM(ch_in_ibdcall_vcf_with_params)
+    """touch ${args.genome_set_id}_${chrno}_hapibd.ibd time_output.txt"""
 }
 
 
 process CALL_IBD_TPBWT_PARAM {
-    tag "${args.genome_set_id}_${chrno}_tpbwtibd"
-    publishDir "${resdir}/${label}/ibd/tpbwtibd/${arg_sp_dir}", \
-        mode: "symlink", pattern: "*_tpbwtibd.ibd"
+    tag "${args.genome_set_id}_${chrno}_tpbwt"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibd/tpbwt/${csp_id}", \
+        mode: "symlink", pattern: "*_tpbwt.ibd"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibdcalltime/tpbwt/${csp_id}", \
+        mode: "symlink", pattern: "time_output.txt"
     input:
-    tuple val(label), val(chrno), val(args), path(vcf), val(tpbwt_args), val(arg_sp_dir)
+    tuple val(label), val(chrno), val(args), path(vcf), val(caller), val(csp_id), val(tpbwt_args)
     output:
-    tuple val(label), val(chrno), path("*_tpbwtibd.ibd")
+    tuple val(label), val(chrno), val(caller), val(csp_id), path("*_tpbwt.ibd")
     script:
     // Lm: params.tpbwt_Lm,
     // Lf: params.tpbwt_Lf,
     // template: params.tpbwt_template_opts,
-    // minmac
+    // minmaf
     // use_phase_correction
     def cmd_options = (tpbwt_args + [
         vcf: vcf,
@@ -1138,138 +1042,31 @@ process CALL_IBD_TPBWT_PARAM {
         genome_set_id: args.genome_set_id,
     ]).collect{k, v -> "--${k} ${v}"}.join(" ")
     """
-    call_tpbwt.py ${cmd_options}
+    /usr/bin/time \
+    call_tpbwt.py ${cmd_options} 2>time_output.txt
+    cat tmp_time_output.txt >> time_output.txt 
     """
     stub:
-    """touch ${args.genome_set_id}_${chrno}_tpbwtibd.ibd"""
-}
-
-workflow OPTIMIZE_TPBWT {
-    // single population model
-    // only simulating neutral situation
-    ch_sp_sets = Channel.fromList(sp_sets.collect {label, args->[label, args]})
-    .filter{label, args -> label == 'sp_neu'}
-
-    // multiple population model
-    ch_mp_sets = Channel.fromList(mp_sets.collect {label, args->[label, args]})
-    .filter{label, args -> label == 'mp_s00'}
-
-    // UK model with human or Pf recombination rates
-    ch_uk_sets = Channel.fromList( [
-        // all demographic parameters are hard-coded in the slim script
-        ["uk_gc0", [seqlen: 60_000_000, gc:0, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60001]],
-        // ["uk_gc1", [seqlen: 60_000_000, gc:1, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60002]],
-        // the following two lines are models that using UK demograhic patterns but Pf recombination rate
-        ["uk_gc0_pf", [seqlen: 900_000, gc:0, r: 6.6666667e-7, u: 1e-8, nsam: 1000, genome_set_id: 60003]],
-        // ["uk_gc1_pf", [seqlen: 900_000, gc:1, r: 6.6666667e-7, u: 1e-8, nsam: 1000, genome_set_id: 60004]],
-    ])
-
-
-    // combine with chrnos 
-    ch_chrs = Channel.fromList(1..(params.nchroms))
-
-    // reorder fields
-    ch_sp_input = ch_sp_sets // label, dict (args)
-        .combine( ch_chrs )
-        .map {label, args, chrno -> [label, chrno, args]}
-
-    ch_mp_input = ch_mp_sets // label, dict (args)
-        .combine( ch_chrs )
-        .map {label, args, chrno -> [label, chrno, args]}
-
-    ch_uk_input = ch_uk_sets // label, dict (args)
-        .combine( ch_chrs )
-        .map {label, args, chrno -> [label, chrno, args]}
-
-    // run simulations
-    SIM_SP_CHR(ch_sp_input)
-    SIM_MP_CHR(ch_mp_input)
-    SIM_UK_CHR(ch_uk_input)
-
-    // prepare ibdcaller input
-    ch_trees_vcf = SIM_SP_CHR.out.trees_vcf
-        .concat(SIM_MP_CHR.out.trees_vcf) // label, chrno, trees, vcf
-        .concat(SIM_UK_CHR.out.trees_vcf) // label, chrno, trees, vcf
-
-    // 
-    ch_tpbwt_args = Channel.fromList([
-        // vary Lm
-        [Lm: 300, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
-        [Lm: 250, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
-        [Lm: 200, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
-        [Lm: 150, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
-        [Lm: 100, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
-        [Lm:  80, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
-        [Lm:  50, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
-        [Lm:  30, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
-        // [Lm:  10, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
-        // [Lm:   3, Lf: 2.0, template:1, use_phase_correction:0, minmac:20],
-
-        // vary Lm, change template
-        [Lm: 300, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
-        [Lm: 250, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
-        [Lm: 200, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
-        [Lm: 150, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
-        [Lm: 100, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
-        [Lm:  80, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
-        [Lm:  50, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
-        [Lm:  30, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
-        // [Lm:  10, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
-        // [Lm:   3, Lf: 2.0, template:0, use_phase_correction:0, minmac:20],
-
-        // vary Lm, change minmac: 0
-        [Lm: 300, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
-        [Lm: 250, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
-        [Lm: 200, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
-        [Lm: 150, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
-        [Lm: 100, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
-        [Lm:  80, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
-        [Lm:  50, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
-        [Lm:  30, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
-        // [Lm:  10, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
-        // [Lm:   3, Lf: 2.0, template:1, use_phase_correction:0, minmac: 0],
-
-    ]).map{args->
-        def arg_sp_dir = String.format("lm%d_lf%f_tp%d_pc%04d_mac%03d", 
-            args.Lm, args.Lf, args.template, args.use_phase_correction, args.minmac
-        )
-        [args, arg_sp_dir]
-    }
-    if (params.test) {
-        ch_tpbwt_args = ch_tpbwt_args.take(1)
-    }
-
-    ch_in_ibdcall_trees = ch_trees_vcf
-        .combine(ch_sp_sets.concat(ch_mp_sets).concat(ch_uk_sets), by:0)
-        .map{label, chrno, trees, vcf, args -> [label, chrno, args, trees] }
-
-    ch_in_ibdcall_vcf = ch_trees_vcf
-        .combine(ch_sp_sets.concat(ch_mp_sets).concat(ch_uk_sets), by:0)
-        .map{label, chrno, trees, vcf, args -> [label, chrno, args, vcf] }
-    
-    ch_in_ibdcall_vcf_with_params = ch_in_ibdcall_vcf 
-        .combine(ch_tpbwt_args) // label, chrno, args, vcf, hapibd_args, arg_sp_dir
-
-    // call hmmibd
-    CALL_IBD_TSKIBD(ch_in_ibdcall_trees)
-    CALL_IBD_TPBWT_PARAM(ch_in_ibdcall_vcf_with_params)
+    """touch ${args.genome_set_id}_${chrno}_tpbwt.ibd time_output.txt"""
 }
 
 
 process CALL_IBD_REFINEDIBD_PARAM {
     tag "${args.genome_set_id}_${chrno}_refinedibd"
-    publishDir "${resdir}/${label}/ibd/refinedibd/${arg_sp_dir}", \
+    publishDir "${resdir}//${args.genome_set_id}_${label}/ibd/refinedibd/${csp_id}", \
         mode: "symlink", pattern: "*_refinedibd.ibd"
+    publishDir "${resdir}//${args.genome_set_id}_${label}/ibd/refinedibd/${csp_id}", \
+        mode: "symlink", pattern: "time_output.txt"
     input:
-    tuple val(label), val(chrno), val(args), path(vcf), val(refinedibd_args), val(arg_sp_dir)
+    tuple val(label), val(chrno), val(args), path(vcf), val(caller), val(csp_id), val(refinedibd_args)
 
     output:
-    tuple val(label), val(chrno), path("*_refinedibd.ibd")
+    tuple val(label), val(chrno), val(caller), val(csp_id), path("*_refinedibd.ibd")
     script:
         // lod: params.refinedibd_lod,
         // length: params.refinedibd_length,
         // scale: params.refinedibd_scale,
-        // minmac
+        // minmaf
         // window
     def cmd_options = (refinedibd_args + [
         vcf: vcf,
@@ -1284,131 +1081,23 @@ process CALL_IBD_REFINEDIBD_PARAM {
     call_refinedibd.py ${cmd_options}
     """
     stub:
-    """touch ${args.genome_set_id}_${chrno}_refinedibd.ibd"""
+    """touch ${args.genome_set_id}_${chrno}_refinedibd.ibd time_output.txt"""
 }
-
-workflow OPTIMIZE_REFINEDIBD {
-    // single population model
-    // only simulating neutral situation
-    ch_sp_sets = Channel.fromList(sp_sets.collect {label, args->[label, args]})
-    .filter{label, args -> label == 'sp_neu'}
-
-    // multiple population model
-    ch_mp_sets = Channel.fromList(mp_sets.collect {label, args->[label, args]})
-    .filter{label, args -> label == 'mp_s00'}
-
-    // UK model with human or Pf recombination rates
-    ch_uk_sets = Channel.fromList( [
-        // all demographic parameters are hard-coded in the slim script
-        ["uk_gc0", [seqlen: 60_000_000, gc:0, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60001]],
-        // ["uk_gc1", [seqlen: 60_000_000, gc:1, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60002]],
-        // the following two lines are models that using UK demograhic patterns but Pf recombination rate
-        ["uk_gc0_pf", [seqlen: 900_000, gc:0, r: 6.6666667e-7, u: 1e-8, nsam: 1000, genome_set_id: 60003]],
-        // ["uk_gc1_pf", [seqlen: 900_000, gc:1, r: 6.6666667e-7, u: 1e-8, nsam: 1000, genome_set_id: 60004]],
-    ])
-
-
-    // combine with chrnos 
-    ch_chrs = Channel.fromList(1..(params.nchroms))
-
-    // reorder fields
-    ch_sp_input = ch_sp_sets // label, dict (args)
-        .combine( ch_chrs )
-        .map {label, args, chrno -> [label, chrno, args]}
-
-    ch_mp_input = ch_mp_sets // label, dict (args)
-        .combine( ch_chrs )
-        .map {label, args, chrno -> [label, chrno, args]}
-
-    ch_uk_input = ch_uk_sets // label, dict (args)
-        .combine( ch_chrs )
-        .map {label, args, chrno -> [label, chrno, args]}
-
-    // run simulations
-    SIM_SP_CHR(ch_sp_input)
-    SIM_MP_CHR(ch_mp_input)
-    SIM_UK_CHR(ch_uk_input)
-
-    // prepare ibdcaller input
-    ch_trees_vcf = SIM_SP_CHR.out.trees_vcf
-        .concat(SIM_MP_CHR.out.trees_vcf) // label, chrno, trees, vcf
-        .concat(SIM_UK_CHR.out.trees_vcf) // label, chrno, trees, vcf
-
-    // 
-    def params_lst = [
-        [lod: 8.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 20 , window: 40.0],
-        [lod: 4.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 20 , window: 40.0],
-        [lod: 3.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 20 , window: 40.0],
-        [lod: 2.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 20 , window: 40.0],
-        [lod: 1.1, length:2.0, scale: Math.sqrt(1000/100) , minmac: 20 , window: 40.0],
-        // change window
-        [lod: 8.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 20 , window: 20.0],
-        [lod: 4.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 20 , window: 20.0],
-        [lod: 3.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 20 , window: 20.0],
-        [lod: 2.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 20 , window: 20.0],
-        [lod: 1.1, length:2.0, scale: Math.sqrt(1000/100) , minmac: 20 , window: 20.0],
-        // change scale
-        [lod: 8.0, length:2.0, scale: Math.sqrt(500/100) , minmac: 20 , window: 40.0],
-        [lod: 4.0, length:2.0, scale: Math.sqrt(500/100) , minmac: 20 , window: 40.0],
-        [lod: 3.0, length:2.0, scale: Math.sqrt(500/100) , minmac: 20 , window: 40.0],
-        [lod: 2.0, length:2.0, scale: Math.sqrt(500/100) , minmac: 20 , window: 40.0],
-        [lod: 1.1, length:2.0, scale: Math.sqrt(500/100) , minmac: 20 , window: 40.0],
-        // change minmac
-        [lod: 8.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 2 , window: 40.0],
-        [lod: 4.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 2 , window: 40.0],
-        [lod: 3.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 2 , window: 40.0],
-        [lod: 2.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 2 , window: 40.0],
-        [lod: 1.1, length:2.0, scale: Math.sqrt(1000/100) , minmac: 2 , window: 40.0],
-
-        [lod: 8.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 200, window: 40.0],
-        [lod: 4.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 200, window: 40.0],
-        [lod: 3.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 200, window: 40.0],
-        [lod: 2.0, length:2.0, scale: Math.sqrt(1000/100) , minmac: 200, window: 40.0],
-        [lod: 1.1, length:2.0, scale: Math.sqrt(1000/100) , minmac: 200, window: 40.0],
-    ]
-    if (params.refinedibd_optimize_params_json != "") {
-        params_lst = read_param_lst_from_json(params.refinedibd_optimize_params_json)
-        println("used params from json file ${params.refinedibd_optimize_params_json}")
-    }
-
-    ch_refinedibd_args = Channel.fromList(params_lst).map{args->
-        def arg_sp_dir = "lod${args.lod}_len${args.length}_scale${args.scale}_minmac${args.minmac}_win${args.window}"
-        [args, arg_sp_dir]
-    }
-    if (params.test) {
-        ch_refinedibd_args = ch_refinedibd_args.take(1)
-    }
-
-    ch_in_ibdcall_trees = ch_trees_vcf
-        .combine(ch_sp_sets.concat(ch_mp_sets).concat(ch_uk_sets), by:0)
-        .map{label, chrno, trees, vcf, args -> [label, chrno, args, trees] }
-
-    ch_in_ibdcall_vcf = ch_trees_vcf
-        .combine(ch_sp_sets.concat(ch_mp_sets).concat(ch_uk_sets), by:0)
-        .map{label, chrno, trees, vcf, args -> [label, chrno, args, vcf] }
-    
-    ch_in_ibdcall_vcf_with_params = ch_in_ibdcall_vcf 
-        .combine(ch_refinedibd_args) // label, chrno, args, vcf, hapibd_args, arg_sp_dir
-
-    // call hmmibd
-    CALL_IBD_TSKIBD(ch_in_ibdcall_trees)
-    CALL_IBD_REFINEDIBD_PARAM(ch_in_ibdcall_vcf_with_params)
-}
-
-
 
 process CALL_IBD_HMMIBD_PARAM {
     tag "${args.genome_set_id}_${chrno}_hmmibd"
-    publishDir "${resdir}/${label}/ibd/hmmibd/${arg_sp_dir}", \
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibd/hmmibd/${csp_id}", \
         mode: "symlink", pattern: "*_hmmibd.ibd"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibdcalltime/hmmibd/${csp_id}", \
+        mode: "symlink", pattern: "time_output.txt"
     input:
-    tuple val(label), val(chrno), val(args), path(vcf),  val(hmmibd_args), val(arg_sp_dir)
+    tuple val(label), val(chrno), val(args), path(vcf),val(caller), val(csp_id), val(hmmibd_args)
     output:
-    tuple val(label), val(chrno), path("*_hmmibd.ibd")
+    tuple val(label), val(chrno),val(caller), val(csp_id), path("*_hmmibd*.ibd")
     script:
         // n: params.hmmibd_n,
         // m: params.hmmibd_m,
-        // minmac:
+        // minmaf:
     def cmd_options = (hmmibd_args+[
         vcf: vcf,
         r: args.r,
@@ -1416,6 +1105,7 @@ process CALL_IBD_HMMIBD_PARAM {
         chrno: chrno,
         mincm: params.mincm,
         genome_set_id: args.genome_set_id,
+        version: params.hmmibd_version,
     ]).collect{k, v -> "--${k} ${v}"}.join(" ")
     script:
         """
@@ -1426,139 +1116,16 @@ process CALL_IBD_HMMIBD_PARAM {
 }
 
 
-workflow OPTIMIZE_HMMIBD {
-    // single population model
-    // only simulating neutral situation
-    ch_sp_sets = Channel.fromList(sp_sets.collect {label, args->[label, args]})
-    .filter{label, args -> label == 'sp_neu'}
-
-    // multiple population model
-    ch_mp_sets = Channel.fromList(mp_sets.collect {label, args->[label, args]})
-    .filter{label, args -> label == 'mp_s00'}
-
-    // UK model with human or Pf recombination rates
-    ch_uk_sets = Channel.fromList( [
-        // all demographic parameters are hard-coded in the slim script
-
-        // NOTE: comment out the uk-human genome. it might be too big for hmmibd as it cause (memory issue) to run isorelate
-        // ["uk_gc0", [seqlen: 60_000_000, gc:0, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60001]],
-
-        // ["uk_gc1", [seqlen: 60_000_000, gc:1, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60002]],
-        // the following two lines are models that using UK demograhic patterns but Pf recombination rate
-        ["uk_gc0_pf", [seqlen: 900_000, gc:0, r: 6.6666667e-7, u: 1e-8, nsam: 1000, genome_set_id: 60003]],
-        // ["uk_gc1_pf", [seqlen: 900_000, gc:1, r: 6.6666667e-7, u: 1e-8, nsam: 1000, genome_set_id: 60004]],
-    ])
-
-
-    // combine with chrnos 
-    ch_chrs = Channel.fromList(1..(params.nchroms))
-
-    // reorder fields
-    ch_sp_input = ch_sp_sets // label, dict (args)
-        .combine( ch_chrs )
-        .map {label, args, chrno -> [label, chrno, args]}
-
-    ch_mp_input = ch_mp_sets // label, dict (args)
-        .combine( ch_chrs )
-        .map {label, args, chrno -> [label, chrno, args]}
-
-    ch_uk_input = ch_uk_sets // label, dict (args)
-        .combine( ch_chrs )
-        .map {label, args, chrno -> [label, chrno, args]}
-
-    // run simulations
-    SIM_SP_CHR(ch_sp_input)
-    SIM_MP_CHR(ch_mp_input)
-    SIM_UK_CHR(ch_uk_input)
-
-    // prepare ibdcaller input
-    ch_trees_vcf = SIM_SP_CHR.out.trees_vcf
-        .concat(SIM_MP_CHR.out.trees_vcf) // label, chrno, trees, vcf
-        .concat(SIM_UK_CHR.out.trees_vcf) // label, chrno, trees, vcf
-
-    // 
-    ch_hmmibd_args = Channel.fromList([
-        [m:  2, n:  10, minmac: 1],
-        [m:  2, n:  30, minmac: 1],
-        [m:  2, n: 100, minmac: 1],
-        [m:  2, n: 300, minmac: 1],
-        [m:  2, n: 9999999, minmac: 1],
-        [m:  5, n:  10, minmac: 1],
-        [m:  5, n:  30, minmac: 1],
-        [m:  5, n: 100, minmac: 1],
-        [m:  5, n: 300, minmac: 1],
-        [m:  5, n: 9999999, minmac: 1],
-        [m: 10, n:  10, minmac: 1],
-        [m: 10, n:  30, minmac: 1],
-        [m: 10, n: 100, minmac: 1],
-        [m: 10, n: 300, minmac: 1],
-        [m: 10, n: 9999999, minmac: 1],
-
-        [m:  2, n:  10, minmac: 20],
-        [m:  2, n:  30, minmac: 20],
-        [m:  2, n: 100, minmac: 20],
-        [m:  2, n: 300, minmac: 20],
-        [m:  2, n: 9999999, minmac: 20],
-        [m:  5, n:  10, minmac: 20],
-        [m:  5, n:  30, minmac: 20],
-        [m:  5, n: 100, minmac: 20],
-        [m:  5, n: 300, minmac: 20],
-        [m:  5, n: 9999999, minmac: 20],
-        [m: 10, n:  10, minmac: 20],
-        [m: 10, n:  30, minmac: 20],
-        [m: 10, n: 100, minmac: 20],
-        [m: 10, n: 300, minmac: 20],
-        [m: 10, n: 9999999, minmac: 20],
-
-        [m:  2, n:  10, minmac: 200],
-        [m:  2, n:  30, minmac: 200],
-        [m:  2, n: 100, minmac: 200],
-        [m:  2, n: 300, minmac: 200],
-        [m:  2, n: 9999999, minmac: 200],
-        [m:  5, n:  10, minmac: 200],
-        [m:  5, n:  30, minmac: 200],
-        [m:  5, n: 100, minmac: 200],
-        [m:  5, n: 300, minmac: 200],
-        [m:  5, n: 9999999, minmac: 200],
-        [m: 10, n:  10, minmac: 200],
-        [m: 10, n:  30, minmac: 200],
-        [m: 10, n: 100, minmac: 200],
-        [m: 10, n: 300, minmac: 200],
-        [m: 10, n: 9999999, minmac: 200],
-    ]).map{args->
-        def arg_sp_dir = String.format("m%d_n%d_minmac%d", 
-            args.m, args.n, args.minmac
-        )
-        [args, arg_sp_dir]
-    }
-    if (params.test) {
-        ch_hmmibd_args = ch_hmmibd_args.take(1)
-    }
-
-    ch_in_ibdcall_trees = ch_trees_vcf
-        .combine(ch_sp_sets.concat(ch_mp_sets).concat(ch_uk_sets), by:0)
-        .map{label, chrno, trees, vcf, args -> [label, chrno, args, trees] }
-
-    ch_in_ibdcall_vcf = ch_trees_vcf
-        .combine(ch_sp_sets.concat(ch_mp_sets).concat(ch_uk_sets), by:0)
-        .map{label, chrno, trees, vcf, args -> [label, chrno, args, vcf] }
-    
-    ch_in_ibdcall_vcf_with_params = ch_in_ibdcall_vcf 
-        .combine(ch_hmmibd_args) // label, chrno, args, vcf, hapibd_args, arg_sp_dir
-
-    // call hmmibd
-    CALL_IBD_TSKIBD(ch_in_ibdcall_trees)
-    CALL_IBD_HMMIBD_PARAM(ch_in_ibdcall_vcf_with_params)
-}
-
 process CALL_IBD_ISORELATE_PARAM {
     tag "${args.genome_set_id}_${chrno}_isorelate"
-    publishDir "${resdir}/${label}/ibd/isorelate/${arg_sp_dir}", \
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibd/isorelate/${csp_id}", \
         mode: "symlink", pattern: "*_isorelate.ibd"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/ibdcalltime/isorelate/${csp_id}", \
+        mode: "symlink", pattern: "time_output.txt"
     input:
-    tuple val(label), val(chrno), val(args), path(vcf), val(isorelate_args), val(arg_sp_dir)
+    tuple val(label), val(chrno), val(args), path(vcf), val(caller), val(csp_id), val(isorelate_args)
     output:
-    tuple val(label), val(chrno), path("*_isorelate.ibd")
+    tuple val(label), val(chrno),val(caller), val(csp_id), path("*_isorelate.ibd")
     script:
         // maf: params.maf,
         // min_snp: params.isorelate_min_snp,
@@ -1580,125 +1147,301 @@ process CALL_IBD_ISORELATE_PARAM {
     """touch ${args.genome_set_id}_${chrno}_isorelate.ibd"""
 }
 
-workflow OPTIMIZE_ISORELATE {
-    // single population model
-    // only simulating neutral situation
-    ch_sp_sets = Channel.fromList(sp_sets.collect {label, args->[label, args]})
-    .filter{label, args -> label == 'sp_neu'}
+process CMP_IBD {
+    tag "${args.genome_set_id}"
+    publishDir "${resdir}/${args.genome_set_id}_${label}/cmpibd/${caller}/${csp_id}",  mode: 'symlink'
+    input:
+        tuple val(label), val(args), val(caller), val(csp_id), path("trueibd_dir/*.ibd"), path("inferredibd_dir/*.ibd") 
+    output:
+        path("*.ovcsv"), emit: overlap
+        path("*.pairtotibdpq"), emit: pair_totibd
+        path("*.poptotibdcsv"), emit: pop_totibd 
+    script:
+    def cmd_args = [
+        id: "${label}_${caller}_${csp_id}",
+        nchroms: params.nchroms,
+        r: args.r,
+        seqlen_bp: args.seqlen,
+        trueibd_dir: "trueibd_dir",
+        inferredibd_dir: "inferredibd_dir",
+    ].collect{k, v -> "--${k} ${v}"}.join(" ")
+    """
+    cmp_ibd.py ${cmd_args}
+    """
+    stub:
+    """
+    touch caller.{ovcsv,pairtotibdpq,poptotibdcsv}
+    """
+}
 
-    // multiple population model
-    ch_mp_sets = Channel.fromList(mp_sets.collect {label, args->[label, args]})
-    .filter{label, args -> label == 'mp_s00'}
+workflow PARAM_OPTIMIZATION {
+    /////////////////////////////////////////////////////
+    // models
+    // - read models from json file
+    def models = [
+        "sp_neu":      sp_defaults + [s: 0.0, genome_set_id: 10000],
+        "mp_neu":      mp_defaults + [s:0.0, genome_set_id: 20000],
+        "uk_human":    [seqlen: 60_000_000, gc:0, r: 1e-8, u: 1.00e-8, nsam: 1000, genome_set_id: 60001],
+        "uk_human2":   [seqlen: 60_000_000, gc:0, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 70001],
+        "uk_pf":       [seqlen: 900_000, gc:0, r: 6.6666667e-7, u: 1e-8, nsam: 1000, genome_set_id: 60003],
+    ]
+    // prepare model input chanel
+    ch_input = Channel.fromList(models.collect{k, v -> [k, v]})
+        .combine(Channel.fromList(1..(params.nchroms)))
+        .map{label, args, chrno -> [label, chrno, args]}
+        .branch{label, chrno, args -> 
+            sp: label.startsWith("sp_")
+            mp: label.startsWith("mp_")
+            uk: label.startsWith("uk_")
+        }
 
-    // UK model with human or Pf recombination rates
-    ch_uk_sets = Channel.fromList( [
-        // all demographic parameters are hard-coded in the slim script
+    /////////////////////////////////////////////////////
+    // simulations and conat vcf/tree results
+    SIM_SP_CHR(ch_input.sp)
+    SIM_MP_CHR(ch_input.mp)
+    SIM_UK_CHR(ch_input.uk)
+    ch_trees_vcf = SIM_SP_CHR.out.trees_vcf
+       .concat(SIM_MP_CHR.out.trees_vcf) // label, chrno, trees, vcf
+       .concat(SIM_UK_CHR.out.trees_vcf) // label, chrno, trees, vcf
 
-        // NOTE: uk-human model is too big for isorelate (memory error)
-        // ["uk_gc0", [seqlen: 60_000_000, gc:0, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60001]],
-        // ["uk_gc1", [seqlen: 60_000_000, gc:1, r: 1e-8, u: 1.38e-8, nsam: 1000, genome_set_id: 60002]],
-        // the following two lines are models that using UK demograhic patterns but Pf recombination rate
-        ["uk_gc0_pf", [seqlen: 900_000, gc:0, r: 6.6666667e-7, u: 1e-8, nsam: 1000, genome_set_id: 60003]],
-        // ["uk_gc1_pf", [seqlen: 900_000, gc:1, r: 6.6666667e-7, u: 1e-8, nsam: 1000, genome_set_id: 60004]],
+    ////////////////////////////////////////////////////
+    // call IBD with caller-specific parameters
+    // - read csp json
+    // - verify json data
+    // - call ibd using the specified caller and parameters
+    
+
+
+    // read csp list from json files
+    if (params.csp_json != ""){
+        ch_csp = Channel.fromPath(params.csp_json)
+            .flatMap{fn -> read_param_from_json(fn)}
+    }
+    else{
+    // default list for testing purpose
+    ch_csp = Channel.from([
+        // ["hmmibd", 1, [m:  2, n:  10, minmaf: 0.001]],
+        // ["refinedibd", 2, [lod: 8.0, length:2.0, scale: Math.sqrt(1000/100) , minmaf: 0.01 , window: 40.0]]
+        ["hapibd", 3, [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers: 100, minmaf: 0.01]]
+    ])
+
+    }
+    
+
+    ch_callibd = ch_trees_vcf.map{label, chrno, trees, vcf -> [label, chrno, models[label], vcf]}.combine( ch_csp )// {
+        .branch{ label, chrno, args, vcf, caller, csp_id, csp_args -> 
+            hapibd:         caller == "hapibd"
+            hmmibd:         caller == "hmmibd" && (label != "uk_human") && (label != "uk_human2")// skip uk_human model, too slow
+            isorelate:      caller == "isorelate" && (label != "uk_human") && (label != "uk_human2")// skip uk_human model, too slow
+            refinedibd:     caller == "refinedibd"
+            tpbwt:          caller == "tpbwt"
+            other:          true
+        }
+
+    // to avoid issue when resume the pipeline
+    println("view one item from the channel to avoid issue when resuming the pipeline")
+    ch_callibd.hapibd.take(1).view()
+    ch_callibd.hmmibd.take(1).view()
+    ch_callibd.isorelate.take(1).view()
+    ch_callibd.refinedibd.take(1).view()
+    ch_callibd.tpbwt.take(1).view()
+
+    // /////////////////////////////////////////////////
+    // Compare IBD inferred vs true
+    // inferred ibd
+    CALL_IBD_HAPIBD_PARAM(ch_callibd.hapibd)
+    CALL_IBD_HMMIBD_PARAM(ch_callibd.hmmibd)
+    CALL_IBD_ISORELATE_PARAM(ch_callibd.isorelate)
+    CALL_IBD_REFINEDIBD_PARAM(ch_callibd.refinedibd)
+    CALL_IBD_TPBWT_PARAM(ch_callibd.tpbwt)
+
+    ch_inferred_ibd = CALL_IBD_HAPIBD_PARAM.out
+        .mix(CALL_IBD_HMMIBD_PARAM.out)
+        .mix(CALL_IBD_ISORELATE_PARAM.out)
+        .mix(CALL_IBD_REFINEDIBD_PARAM.out)
+        .mix(CALL_IBD_TPBWT_PARAM.out)
+        // group
+        .map{label, chrno, caller, csp_id, ibd -> [ groupKey([label, caller, csp_id], params.nchroms), [ chrno, ibd] ]}
+        .groupTuple(sort: (a, b) -> a[0]<=>b[0] )
+        .map{k,  ll -> [k[0], k[1], k[2], ll.collect{it[1]}]} // label, caller, csp_id, ibd_lst
+    
+
+    // true ibd
+    CALL_IBD_TSKIBD( ch_trees_vcf.map{label, chrno, trees, vcf -> [label, chrno, models[label], trees]} )
+    ch_true_ibd = CALL_IBD_TSKIBD.out.ibd
+        .map{label, chrno, ibd -> [groupKey(label, params.nchroms), [chrno, ibd] ]}
+        .groupTuple(sort: (a, b) -> a[0] <=> b[0])
+        .map{gkey, ll -> ["${gkey}", ll.collect{it[1]}]} // label, ibd_lst. 
+        // Note gkey is not a string shoule get a string value of the key to combine with ch_inferred_ibd
+
+
+    ch_true_inferr = ch_true_ibd.combine(ch_inferred_ibd, by: 0)//.view()
+        .map{ label, trueibd_lst, caller, csp_id, inferredibd_lst -> [label, models[label], caller, csp_id, trueibd_lst, inferredibd_lst]}//.view()
+
+    
+    
+    // compare ibd
+    CMP_IBD(ch_true_inferr)
+}
+
+// largely similar to optimize parameter workflow
+// with different moddels and parameter parameters
+workflow WF_VARY_RECOM_RATE {
+    /////////////////////////////////////////////////////
+    // models
+    // - read models from json file
+    def models = [
+        "sp_neu_0003":      sp_defaults + [s: 0.0, genome_set_id: 10000, r:     3e-9, seqlen: (1.0 /   3e-9).toInteger() ],
+        "sp_neu_0010":      sp_defaults + [s: 0.0, genome_set_id: 10000, r:    10e-9, seqlen: (1.0 /  10e-9).toInteger() ],
+        "sp_neu_0030":      sp_defaults + [s: 0.0, genome_set_id: 10000, r:    30e-9, seqlen: (1.0 /  30e-9).toInteger() ],
+        "sp_neu_0100":      sp_defaults + [s: 0.0, genome_set_id: 10000, r:   100e-9, seqlen: (1.0 / 100e-9).toInteger() ],
+        "sp_neu_0300":      sp_defaults + [s: 0.0, genome_set_id: 10000, r:   300e-9, seqlen: (1.0 / 300e-9).toInteger() ],
+        "sp_neu_0667":      sp_defaults + [s: 0.0, genome_set_id: 10000, r:   667e-9, seqlen: (1.0 / 667e-9).toInteger() ],
+        "sp_neu_1000":      sp_defaults + [s: 0.0, genome_set_id: 10000, r:  1000e-9, seqlen: (1.0 /1000e-9).toInteger() ],
+    ]
+
+    models.each{}
+    // prepare model input chanel
+    def nchroms = 4 // no need to be as large as params.nchrom
+
+    ch_input = Channel.fromList(models.collect{k, v -> [k, v]})
+        .combine(Channel.fromList(1..nchroms))
+        .map{label, args, chrno -> [label, chrno, args]}
+
+    /////////////////////////////////////////////////////
+    // simulations and conat vcf/tree results
+    SIM_SP_CHR(ch_input)
+
+    ch_trees_vcf = SIM_SP_CHR.out.trees_vcf
+       .filter{ label, chrno, trees, vcf -> label != "sp_neu_0003" } // filter out this one as its genome size in bp is too large for slow ibd callers such as refinedibd
+
+    ch_csp = Channel.from([
+        // use parameter before any optimization
+        ["hapibd", 1, [minseed: 2, minoutput: 2, minextend: 1, maxgap: 1000,  minmarkers: 100, minmaf: 0.01]],
+        ["hmmibd", 2, [m:  5, n:  100, minmaf: 0.01]],
+        ["isorelate", 3, [minmaf:0.01, min_snp:20] ],
+        ["refinedibd", 4, [lod: 4.0, length:2.0, scale: Math.sqrt(1000/100) , minmaf: 0.01 , window: 40.0, trim: 0.15]],
+        ["tpbwt", 5, [Lm:300, Lf:2.0, template:0, use_phase_correction:0, minmaf: 0.01]]
     ])
 
 
-    // combine with chrnos 
+    ch_callibd = ch_trees_vcf.map{label, chrno, trees, vcf -> [label, chrno, models[label], vcf]}.combine( ch_csp )// {
+        .branch{ label, chrno, args, vcf, caller, csp_id, csp_args -> 
+            hapibd:         caller == "hapibd"
+            hmmibd:         caller == "hmmibd" 
+            isorelate:      (caller == "isorelate") && (args.r >=  100e-9 ) // skip very small r, large genome, IBD caller too slow
+            refinedibd:     caller == "refinedibd"
+            tpbwt:          caller == "tpbwt"
+            other:          true
+        }
+
+    // to avoid issue when resume the pipeline
+    println("view one item from the channel to avoid issue when resuming the pipeline")
+    ch_callibd.hapibd.take(1).view()
+    ch_callibd.hmmibd.take(1).view()
+    ch_callibd.isorelate.take(1).view()
+    ch_callibd.refinedibd.take(1).view()
+    ch_callibd.tpbwt.take(1).view()
+
+    // /////////////////////////////////////////////////
+    // Compare IBD inferred vs true
+    // inferred ibd
+    CALL_IBD_HAPIBD_PARAM(ch_callibd.hapibd)
+    CALL_IBD_HMMIBD_PARAM(ch_callibd.hmmibd)
+    CALL_IBD_ISORELATE_PARAM(ch_callibd.isorelate)
+    CALL_IBD_REFINEDIBD_PARAM(ch_callibd.refinedibd)
+    CALL_IBD_TPBWT_PARAM(ch_callibd.tpbwt)
+
+    ch_inferred_ibd = CALL_IBD_HAPIBD_PARAM.out
+        .mix(CALL_IBD_HMMIBD_PARAM.out)
+        .mix(CALL_IBD_ISORELATE_PARAM.out)
+        .mix(CALL_IBD_REFINEDIBD_PARAM.out)
+        .mix(CALL_IBD_TPBWT_PARAM.out)
+        // group
+        .map{label, chrno, caller, csp_id, ibd -> [ groupKey([label, caller, csp_id], nchroms), [ chrno, ibd] ]}
+        .groupTuple(sort: (a, b) -> a[0]<=>b[0] )
+        .map{k,  ll -> [k[0], k[1], k[2], ll.collect{it[1]}]} // label, caller, csp_id, ibd_lst
+    
+
+    // true ibd
+    CALL_IBD_TSKIBD( ch_trees_vcf.map{label, chrno, trees, vcf -> [label, chrno, models[label], trees]} )
+    ch_true_ibd = CALL_IBD_TSKIBD.out.ibd
+        .map{label, chrno, ibd -> [groupKey(label, nchroms), [chrno, ibd] ]}
+        .groupTuple(sort: (a, b) -> a[0] <=> b[0])
+        .map{gkey, ll -> ["${gkey}", ll.collect{it[1]}]} // label, ibd_lst. 
+        // Note gkey is not a string shoule get a string value of the key to combine with ch_inferred_ibd
+
+
+    ch_true_inferr = ch_true_ibd.combine(ch_inferred_ibd, by: 0)//.view()
+        .map{ label, trueibd_lst, caller, csp_id, inferredibd_lst -> [label, models[label], caller, csp_id, trueibd_lst, inferredibd_lst]}
+
+    ch_true_ibd.view{it -> it[0]}
+    ch_inferred_ibd.view{it -> it[0]}
+    ch_true_inferr.view()
+    
+    // compare ibd
+    CMP_IBD(ch_true_inferr)
+}
+
+
+workflow WF_SP_COMPUTATION_BENCH {
+
+    main:
+
+    // *********************** Log Params *************************
+    def sp_set_args_keys = sp_sets.collect{k, v -> v}[0].collect{k, v->k}
+    ch_sp_sets = Channel.fromList(sp_sets.collect {label, args->[label, args]})
+
+    Channel.value(['label'] + sp_set_args_keys)
+        .concat( ch_sp_sets.map{k, args -> 
+            [k] + sp_set_args_keys.collect{i -> args[i]} }
+        )
+        .map{lst-> lst.join("\t")}
+        .collectFile(name: "sp_sets.tsv", newLine: true, storeDir: resdir, sort:false)
+
+    // ***********************Simulation *************************
+
     ch_chrs = Channel.fromList(1..(params.nchroms))
 
-    // reorder fields
-    ch_sp_input = ch_sp_sets // label, dict (args)
+    ch_sp_input = ch_sp_sets
         .combine( ch_chrs )
         .map {label, args, chrno -> [label, chrno, args]}
 
-    ch_mp_input = ch_mp_sets // label, dict (args)
-        .combine( ch_chrs )
-        .map {label, args, chrno -> [label, chrno, args]}
-
-    ch_uk_input = ch_uk_sets // label, dict (args)
-        .combine( ch_chrs )
-        .map {label, args, chrno -> [label, chrno, args]}
-
-    // run simulations
     SIM_SP_CHR(ch_sp_input)
-    SIM_MP_CHR(ch_mp_input)
-    SIM_UK_CHR(ch_uk_input)
 
-    // prepare ibdcaller input
-    ch_trees_vcf = SIM_SP_CHR.out.trees_vcf
-        .concat(SIM_MP_CHR.out.trees_vcf) // label, chrno, trees, vcf
-        .concat(SIM_UK_CHR.out.trees_vcf) // label, chrno, trees, vcf
 
-    // 
-    ch_isorelate_args = Channel.fromList([
-        [minac: 0, min_snp: 1],
-        [minac: 0, min_snp: 3],
-        [minac: 0, min_snp: 10],
-        [minac: 0, min_snp: 15],
-        [minac: 0, min_snp: 20],
-        [minac: 0, min_snp: 40],
-        [minac: 0, min_snp: 80],
-        [minac: 0, min_snp:160],
-
-        [minac: 20, min_snp: 1],
-        [minac: 20, min_snp: 3],
-        [minac: 20, min_snp: 10],
-        [minac: 20, min_snp: 15],
-        [minac: 20, min_snp: 20],
-        [minac: 20, min_snp: 40],
-        [minac: 20, min_snp: 80],
-        [minac: 20, min_snp:160],
-
-        [minac: 60, min_snp: 1],
-        [minac: 60, min_snp: 3],
-        [minac: 60, min_snp: 10],
-        [minac: 60, min_snp: 15],
-        [minac: 60, min_snp: 20],
-        [minac: 60, min_snp: 40],
-        [minac: 60, min_snp: 80],
-        [minac: 60, min_snp:160],
-
-        [minac: 200, min_snp: 1],
-        [minac: 200, min_snp: 3],
-        [minac: 200, min_snp: 10],
-        [minac: 200, min_snp: 15],
-        [minac: 200, min_snp: 20],
-        [minac: 200, min_snp: 40],
-        [minac: 200, min_snp: 80],
-        [minac: 200, min_snp:160],
-
-        [minmac: 600, min_snp: 1],
-        [minmac: 600, min_snp: 3],
-        [minmac: 600, min_snp: 10],
-        [minmac: 600, min_snp: 15],
-        [minmac: 600, min_snp: 20],
-        [minmac: 600, min_snp: 40],
-        [minmac: 600, min_snp: 80],
-        [minmac: 600, min_snp:160],
-    ]).map{args->
-        def nsam = 1000
-        def arg_sp_dir = String.format("maf%f_minsnp%d", 
-            args.minmac * 2 / nsam , args.min_snp
-        )
-        [args, arg_sp_dir]
-    }
-    if (params.test) {
-        ch_isorelate_args = ch_isorelate_args.take(1)
-    }
+    // *********************** Call ibd *************************
+    ch_trees_vcf = SIM_SP_CHR.out.trees_vcf // label, chrno, trees, vcf
 
     ch_in_ibdcall_trees = ch_trees_vcf
-        .combine(ch_sp_sets.concat(ch_mp_sets).concat(ch_uk_sets), by:0)
+        .combine(ch_sp_sets, by:0)
         .map{label, chrno, trees, vcf, args -> [label, chrno, args, trees] }
 
     ch_in_ibdcall_vcf = ch_trees_vcf
-        .combine(ch_sp_sets.concat(ch_mp_sets).concat(ch_uk_sets), by:0)
+        .combine(ch_sp_sets, by:0)
         .map{label, chrno, trees, vcf, args -> [label, chrno, args, vcf] }
-    
-    ch_in_ibdcall_vcf_with_params = ch_in_ibdcall_vcf 
-        .combine(ch_isorelate_args) // label, chrno, args, vcf, hapibd_args, arg_sp_dir
 
-    // call hmmibd
-    CALL_IBD_TSKIBD(ch_in_ibdcall_trees)
-    CALL_IBD_ISORELATE_PARAM(ch_in_ibdcall_vcf_with_params)
+    // CALL_IBD_TSINFERIBD(ch_in_ibdcall_vcf_with_ne)
+    if (params.compute_bench_large_size == 0)
+    {
+        CALL_IBD_HAPIBD(ch_in_ibdcall_vcf)
+        CALL_IBD_TSKIBD(ch_in_ibdcall_trees)
+        CALL_IBD_REFINEDIBD(ch_in_ibdcall_vcf)
+        CALL_IBD_TPBWT(ch_in_ibdcall_vcf)
+        CALL_IBD_HMMIBD(ch_in_ibdcall_vcf)
+        CALL_IBD_HMMIBDRS(ch_in_ibdcall_vcf)
+        CALL_IBD_ISORELATE(ch_in_ibdcall_vcf)
+    }
+    else {
+        CALL_IBD_HAPIBD(ch_in_ibdcall_vcf)
+        // CALL_IBD_TSKIBD(ch_in_ibdcall_trees)
+        CALL_IBD_REFINEDIBD(ch_in_ibdcall_vcf)
+        // CALL_IBD_TPBWT(ch_in_ibdcall_vcf)
+        // CALL_IBD_HMMIBD(ch_in_ibdcall_vcf)
+        CALL_IBD_HMMIBDRS(ch_in_ibdcall_vcf.map {
+            label, chrno, args, vcf -> [label, chrno, args + [optimize_for_large_size: 1], vcf]
+        })
+        // CALL_IBD_ISORELATE(ch_in_ibdcall_vcf)
+    }
+
 }
-
