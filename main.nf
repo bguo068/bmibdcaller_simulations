@@ -1105,6 +1105,7 @@ process CALL_IBD_HMMIBD_PARAM {
         chrno: chrno,
         mincm: params.mincm,
         genome_set_id: args.genome_set_id,
+        num_threads: task.cpus,
         version: params.hmmibd_version,
     ]).collect{k, v -> "--${k} ${v}"}.join(" ")
     script:
