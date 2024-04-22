@@ -88,7 +88,10 @@ Path("run_isorelate.R").write_text(r_code)
 # ------- run R code to generate the ibd file
 cmd = ["/usr/bin/time", "Rscript", "run_isorelate.R"]
 res = run(cmd, text=True, capture_output=True)
-assert res.returncode == 0
+if res.returncode != 0:
+    import sys
+    print(res.stderr, file=sys.stderr)
+    sys.exit(-1)
 
 with open("time_output.txt", "w") as f:
     f.write(res.stderr)
