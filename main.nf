@@ -683,7 +683,7 @@ workflow WF_SP {
             .concat(CALL_IBD_REFINEDIBD.out.ibd.map{it+ ["refinedibd"]})
             .concat(CALL_IBD_TPBWT.out.ibd.map{it + ["tpbwt"]})
             .concat(CALL_IBD_HMMIBD.out.ibd.map{it + ["hmmibd"]})
-            .concat(CALL_IBD_ISORELATE.ibd.out.map{it+["isorelate"]})
+            .concat(CALL_IBD_ISORELATE.out.ibd.map{it+["isorelate"]})
             // [label, chrno, ibd, ibdcaller]
         .map{label, chrno, ibd, ibdcaller ->
             def key =  groupKey([label, ibdcaller], params.nchroms)
