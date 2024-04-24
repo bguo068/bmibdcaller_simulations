@@ -1,24 +1,30 @@
 # `bmibdcaller_simulations`
 
 This repository hosts an Identity-By-Descent (IBD) caller benchmarking pipeline
-written in [Nextflow](https://github.com/nextflow-io/nextflow), which uses
-population genetic simulation and true IBD to compare the performance of IBD
-segment detection methods for species with high recombination rates and low
-marker densities (per genetic unit), including _Plasmodium falciparum (Pf)_.
+written in
+[Nextflow](https://github.com/nextflow-io/nextflow), 
+which uses population genetic simulation and true IBD to compare the performance
+of IBD segment detection methods for species with high recombination rates and
+low marker densities (per genetic unit), including _Plasmodium falciparum (Pf)_.
 Population genetic simulations are based on a combination of forward simulation
-via [SLiM] (https://github.com/MesserLab/SLiM), coalescent simulation [msprime]
-(https:// github.com/tskit-dev/msprime) and their intergration via [pyslim]
-(https://github.com/ tskit-dev/pyslim). True IBD segments are obtained from
-simulated tree sequences via [tskibd](https://github.com/bguo068/tskibd)
+via
+[SLiM](https://github.com/MesserLab/SLiM), 
+coalescent simulation 
+[msprime](https://github.com/tskit-dev/msprime) 
+and their intergration via 
+[pyslim](https://github.com/ tskit-dev/pyslim). 
+True IBD segments are obtained from
+simulated tree sequences via 
+[tskibd](https://github.com/bguo068/tskibd).
 
 The pipeline is part of a broader project `bmibdcaller`, which also includes the
 following repositories:
-- [bmibdcaller\_empirical](https://github.com/bguo068/bmibdcaller_empirical) for
-empirical analysis.
-- [ishare/ibdutils](https://github.com/bguo068/ishare) for effienciently
-comparing two sets of inferred IBD segments.
-- [tskibd](https://github.com/bguo068/tskibd) for obtaining true ibd segments
-from simulated genealogical trees. 
+- [bmibdcaller\_empirical](https://github.com/bguo068/bmibdcaller_empirical) 
+for empirical analysis.
+- [ishare/ibdutils](https://github.com/bguo068/ishare)
+for effienciently comparing two sets of inferred IBD segments.
+- [tskibd](https://github.com/bguo068/tskibd) 
+for obtaining true ibd segments from simulated genealogical trees. 
 
 # What are in the pipeline:
 
@@ -26,13 +32,15 @@ from simulated genealogical trees.
 
 This workflow allows the simulation of genomes with different recombination
 rates from 1e-6 to 1e-8 /bp/generation but a fixed mutation rate. The accuracy
-of detected IBD segments from different IBD callers, including [hap-IBD]
-(https://github.com/browning-lab/hap-ibd), [hmmIBD](https://github.com/
-glipsnort/hmmIBD), [isoRelate](https://github.com/bahlolab/isoRelate), [Refined
-IBD](https://faculty.washington.edu/browning/refined-ibd.html), and [phased
-IBD](https://github.com/23andMe/phasedibd), are evaluated by comparing them
-with true IBD segments to understand how recombination rate and low
-per-genetic-unit marker density affect the performance of different IBD callers.
+of detected IBD segments from different IBD callers, including 
+[hap-IBD](https://github.com/browning-lab/hap-ibd), 
+[hmmIBD](https://github.com/glipsnort/hmmIBD), 
+[isoRelate](https://github.com/bahlolab/isoRelate), 
+[Refined IBD](https://faculty.washington.edu/browning/refined-ibd.html), and 
+[phased IBD](https://github.com/23andMe/phasedibd), 
+are evaluated by comparing them with true IBD segments to understand how
+recombination rate and low per-genetic-unit marker density affect the
+performance of different IBD callers.
 
 
 ## Parameter optimization workflow `PARAM_OPTIMIZATION`
@@ -64,15 +72,15 @@ parameters), processing and downstream analysis parameters.
 1. The pipeline has been tested/run under the Linux operating system. It should also
    work on MacOS. On windows, it is recommended to use WSL (Windows
    Subsystem for Linux).
-2. Install conda (miniforge). See instructions from [here](https://github.com/
-conda-forge/miniforge)
+2. Install conda (miniforge). See instructions from 
+[here](https://github.com/conda-forge/miniforge)
 3. Create a conda environment and activate the enviroment:
 ```sh
 conda env create -f  env/bmibdcaller_simulations.yaml
 conda activate bmibdcaller_simulations
 ```
-4. Install software that is not available via conda. See notes [here](./env/
-additional_setup.md)
+4. Install software that is not available via conda. See notes 
+[here](./env/additional_setup.md)
 
 # How to run the pipeline
 
