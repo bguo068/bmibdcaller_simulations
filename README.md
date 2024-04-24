@@ -95,6 +95,23 @@ quality: see example in
    downstream analysis): see example in
    [simulations/r240108/run.sh](simulations/r240108/run.sh)
 
+## Nextflow executors:
+In the pipeline configuration file `nextflow.config`, several executors have been 
+used to showcase how the pipeline can be run under different computing environments,
+including: 
+- `local` for a single-node high performance computer(HPC)
+- `sge` for grid server that is managed by the Sun Grid Engine (SGE) system
+- `hq` for either single-node HPC or grid server. 
+   - It supports automatic worker deployment on grid server managed by PBS or slurm.
+   - For other system such as SGE, it works after manual worker deployment (which I used here)
+      - For example, I can run `hq server start` on the login nodes (within tmux) 
+      to launch the hyperqueue server,  then run 
+      `conda activate [env]; cd [workdir]` to switch to the correct working folder 
+      and conda environment, and finally launch as many worker jobs as needed by running
+      `qsub -b yes -cwd -V -l h='computing_node_name' hq worker start `.
+   - More document can be found 
+   [here](https://it4innovations.github.io/hyperqueue/v0.18.0/deployment/worker/#deploying-a-worker-using-pbsslurm)
+
 # Examining result folders
 
 The path of output folders for each process can be found by checking the
