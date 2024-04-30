@@ -1439,9 +1439,9 @@ workflow WF_SP_COMPUTATION_BENCH {
         CALL_IBD_REFINEDIBD(ch_in_ibdcall_vcf)
         // CALL_IBD_TPBWT(ch_in_ibdcall_vcf)
         // CALL_IBD_HMMIBD(ch_in_ibdcall_vcf)
-        CALL_IBD_HMMIBDRS(ch_in_ibdcall_vcf.map {
-            label, chrno, args, vcf -> [label, chrno, args + [optimize_for_large_size: 1], vcf]
-        })
+        // CALL_IBD_HMMIBDRS(ch_in_ibdcall_vcf.map {
+        //     label, chrno, args, vcf -> [label, chrno, args + [optimize_for_large_size: 1], vcf]
+        // })
         // CALL_IBD_ISORELATE(ch_in_ibdcall_vcf)
     }
 
