@@ -1,54 +1,61 @@
 #! /usr/bin/env bash
+set -eEx -o pipefail
 
-#rerun on 1/16/24 after fix mac/maf issue
+# modify this to a path that you have write permission
+SCRATCHDIR=/local/scratch/bing/
+PIPELINEDIR=/local/chib/toconnor_grp/bing/bmibdcaller_simulations/
 
-. ~/conda_devel.sh
 conda activate bmibdcaller_simulations
-mkdir -p /local/scratch/bing/bmibdcaller_simulations/simulations/r240108/
-cd /local/scratch/bing/bmibdcaller_simulations/simulations/r240108/
 
+mkdir -p ${SCRATCHDIR}/bmibdcaller_simulations/simulations/r240108/
+cd  ${SCRATCHDIR}/bmibdcaller_simulations/simulations/r240108/
+
+# generate json files
+python3 ${PIPELINEDIR}/simulations/r240108/gen_sets_json.py
+
+# optimized 
+# with different values for the mincm parameter for IBDne and 
+# with or without removing segments with TMRCA < 1.5 generations
 # Note the 2nd run of the pipeline will use the cached, shared results from first run
-
-# optimized
-~/.local/bin/nextflow \
-    /local/chib/toconnor_grp/bing/bmibdcaller_simulations/main2.nf \
+nextflow \
+    ${PIPELINEDIR}/main.nf \
     -resume -profile hq \
-    --sp_sets_json /local/chib/toconnor_grp/bing/bmibdcaller_simulations/simulations/r240108/sp_sets.json \
-    --mp_sets_json /local/chib/toconnor_grp/bing/bmibdcaller_simulations/simulations/r240108/mp_sets.json \
+    --sp_sets_json sp_sets.json \
+    --mp_sets_json mp_sets.json \
     --ibdne_mincm 2 \
     --filt_ibd_by_ov false \
     --resdir res_ibdnemincm2 && \
-~/.local/bin/nextflow \
-    /local/chib/toconnor_grp/bing/bmibdcaller_simulations/main2.nf \
+nextflow \
+    ${PIPELINEDIR}/main.nf \
     -resume -profile hq \
-    --sp_sets_json /local/chib/toconnor_grp/bing/bmibdcaller_simulations/simulations/r240108/sp_sets.json \
-    --mp_sets_json /local/chib/toconnor_grp/bing/bmibdcaller_simulations/simulations/r240108/mp_sets.json \
+    --sp_sets_json sp_sets.json \
+    --mp_sets_json mp_sets.json \
     --ibdne_mincm 4 \
     --filt_ibd_by_ov false \
     --resdir res_ibdnemincm4 && \
-~/.local/bin/nextflow \
-    /local/chib/toconnor_grp/bing/bmibdcaller_simulations/main2.nf \
+nextflow \
+    ${PIPELINEDIR}/main.nf \
     -resume -profile hq \
-    --sp_sets_json /local/chib/toconnor_grp/bing/bmibdcaller_simulations/simulations/r240108/sp_sets.json \
-    --mp_sets_json /local/chib/toconnor_grp/bing/bmibdcaller_simulations/simulations/r240108/mp_sets.json \
+    --sp_sets_json sp_sets.json \
+    --mp_sets_json mp_sets.json \
     --ibdne_mincm 2 \
     --filt_ibd_by_ov true \
     --resdir res_ibdnemincm2_filtov && \
-~/.local/bin/nextflow \
-    /local/chib/toconnor_grp/bing/bmibdcaller_simulations/main2.nf \
+nextflow \
+    ${PIPELINEDIR}/main.nf \
     -resume -profile hq \
-    --sp_sets_json /local/chib/toconnor_grp/bing/bmibdcaller_simulations/simulations/r240108/sp_sets.json \
-    --mp_sets_json /local/chib/toconnor_grp/bing/bmibdcaller_simulations/simulations/r240108/mp_sets.json \
+    --sp_sets_json sp_sets.json \
+    --mp_sets_json mp_sets.json \
     --ibdne_mincm 4 \
     --filt_ibd_by_ov true \
     --resdir res_ibdnemincm4_filtov
 
 # unoptimized
-~/.local/bin/nextflow \
-    /local/chib/toconnor_grp/bing/bmibdcaller_simulations/main2.nf \
+nextflow \
+    ${PIPELINEDIR}/main.nf \
     -resume -profile hq \
-    --sp_sets_json /local/chib/toconnor_grp/bing/bmibdcaller_simulations/simulations/r240108/sp_sets.json \
-    --mp_sets_json /local/chib/toconnor_grp/bing/bmibdcaller_simulations/simulations/r240108/mp_sets.json \
+    --sp_sets_json sp_sets.json \
+    --mp_sets_json mp_sets.json \
     --ibdne_mincm 2 \
     --filt_ibd_by_ov true \
     --resdir res_ibdnemincm2_filtov_unopti \
@@ -70,5 +77,3 @@ cd /local/scratch/bing/bmibdcaller_simulations/simulations/r240108/
     --tpbwt_template_opts 0 \
     --tpbwt_Lm 300 \
     --tpbwt_Lf 2.0 
-
-

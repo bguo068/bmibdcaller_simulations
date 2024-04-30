@@ -1,14 +1,22 @@
+#! /usr/bin/env bash
+set -eEx -o pipefail
 
-source ~/conda_devel.sh 
+# modify this to a path that you have write permission
+SCRATCHDIR=/local/scratch/bing/
+PIPELINEDIR=/local/chib/toconnor_grp/bing/bmibdcaller_simulations/
+
 conda activate bmibdcaller_simulations
-mkdir -p /local/scratch/bing/bmibdcaller_simulations/simulations/r231226  
-cd /local/scratch/bing/bmibdcaller_simulations/simulations/r231226  
+
+mkdir -p ${SCRATCHDIR}/bmibdcaller_simulations/simulations/r231226  
+cd ${SCRATCHDIR}/bmibdcaller_simulations/simulations/r231226  
 
 # generate json files
 python gen_json.py 
 
 # run the pipeline
-~/.local/bin/nextflow  /local/chib/toconnor_grp/bing/bmibdcaller_simulations/main2.nf -profile hq -resume -entry PARAM_OPTIMIZATION --csp_json '*.json' 
-
-# NOTE: 
-# check whether using rare variants improve IBD quality for hmmIBD: hmmibd_origalgmaf001.json
+nextflow  \
+    ${PIPELINEDIR}/main.nf \
+    -profile hq \
+    -resume \
+    -entry PARAM_OPTIMIZATION \
+    --csp_json '*.json' 
