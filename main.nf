@@ -478,11 +478,11 @@ process CALL_IBD_ISORELATE {
         minmaf: params.isorelate_minmaf,
         imiss: params.isorelate_imiss,
         vmiss: params.isorelate_vmiss,
-        cpus: task.cpus,
+        // cpus: task.cpus,
         genome_set_id: args.genome_set_id,
     ].collect{k, v -> "--${k} ${v}"}.join(" ")
     """
-    call_isorelate.py ${cmd_options}
+    call_isorelate.py ${cmd_options} --cpus ${task.cpus}
     """
     stub:
     """touch ${args.genome_set_id}_${chrno}_isorelate.ibd time_output.txt"""
@@ -1138,11 +1138,11 @@ process CALL_IBD_ISORELATE_PARAM {
         min_len_bp: Math.round(params.mincm * (0.01/args.r)),
         imiss: params.isorelate_imiss,
         vmiss: params.isorelate_vmiss,
-        cpus: task.cpus,
+        // cpus: task.cpus,
         genome_set_id: args.genome_set_id,
     ]).collect{k, v -> "--${k} ${v}"}.join(" ")
     """
-    call_isorelate.py ${cmd_options}
+    call_isorelate.py ${cmd_options} --cpus ${task.cpus}
     """
     stub:
     """touch ${args.genome_set_id}_${chrno}_isorelate.ibd"""
