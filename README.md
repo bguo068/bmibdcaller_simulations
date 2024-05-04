@@ -12,7 +12,7 @@ via
 coalescent simulation 
 [msprime](https://github.com/tskit-dev/msprime) 
 and their intergration via 
-[pyslim](https://github.com/ tskit-dev/pyslim). 
+[pyslim](https://github.com/tskit-dev/pyslim). 
 True IBD segments are obtained from
 simulated tree sequences via 
 [tskibd](https://github.com/bguo068/tskibd).
@@ -27,6 +27,8 @@ for effienciently comparing two sets of inferred IBD segments.
 for obtaining true ibd segments from simulated genealogical trees. 
 
 # What are in the pipeline:
+
+The pipeline includes four different workflows: 
 
 ## Varying recombination rate workflow `WF_VARY_RECOM_RATE`
 
