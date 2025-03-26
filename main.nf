@@ -508,6 +508,14 @@ workflow PARAM_OPTIMIZATION {
     CALL_IBD_REFINEDIBD_PARAM(ch_callibd.refinedibd)
     CALL_IBD_TPBWT_PARAM(ch_callibd.tpbwt)
 
+    ///////////////////////////////////////////////////////
+    // Log params
+    log_ibdcall_csp_params(ch_callibd.hapibd, "param_optimization_hapibd.params.tsv")
+    log_ibdcall_csp_params(ch_callibd.hmmibd, "param_optimization_hmmibd.params.tsv")
+    log_ibdcall_csp_params(ch_callibd.isorelate, "param_optimization_isorelate.params.tsv")
+    log_ibdcall_csp_params(ch_callibd.refinedibd, "param_optimization_refinedibd.params.tsv")
+    log_ibdcall_csp_params(ch_callibd.tpbwt, "param_optimization_tpbwt.params.tsv")
+
     ch_inferred_ibd = CALL_IBD_HAPIBD_PARAM.out
         .mix(CALL_IBD_HMMIBD_PARAM.out)
         .mix(CALL_IBD_ISORELATE_PARAM.out)
@@ -1573,4 +1581,131 @@ def get_mp_sets() {
     if (params.mp_sets_json != "") {
         mp_sets = read_param_from_json(params.mp_sets_json)
     }
+}
+
+
+def log_sim_params(ch_sim_input, filename) {
+    // get a union set of args keys
+    def ch_sim_args_keys = ch_sim_input
+        .map { _label, _chrno, args -> args }
+        .collect()
+        .map { lst ->
+            def args_all = [:]
+            lst.each { it -> args_all = args_all + it }
+            def args_keys = args_all.collect { k, _v -> k }
+            [args_keys]
+        }
+    // preare header line
+    def ch_log_header = ch_sim_input
+        .take(1)
+        .combine(ch_sim_args_keys)
+        .map { _label, _chrno, _args, args_keys ->
+            ["label", "chrno"] + args_keys
+        }
+    // prepare value lines
+    def ch_log_values = ch_sim_input
+        .combine(ch_sim_args_keys)
+        .map { label, chrno, args, args_keys ->
+            [label, chrno] + args_keys.collect { k -> args[k] }
+        }
+
+    // write a file
+    def out_file = file(launchDir).resolve(params.resdir) / filename
+    ch_log_header
+        .concat(ch_log_values)
+        .map { it.join("\t") }
+        .collectFile(name: out_file, newLine: true, sort: false)
+}
+
+def get_global_caller_params(caller) {
+    assert caller in ["tpbwt", "hapibd", "refinedibd", "hmmibd", "isorelate"]
+    def args = [minmaf: params.minmaf, mincm: params.mincm]
+    def caller_global_args = params
+        .findAll { k, _v -> k.startsWith(caller + "_") }
+        .collectEntries { k, v ->
+            [k.replaceFirst(caller + "_", ""), v]
+        }
+    return args + caller_global_args
+}
+
+def log_ibdcall_params(ch_ibdcall_input, caller, filename) {
+    def global_caller_args = get_global_caller_params(caller)
+    // find all arg keys (union set)
+    def ch_sim_args_keys = ch_ibdcall_input
+        .map { _label, _chrno, sim_args, _vcf_or_tree -> sim_args }
+        .collect()
+        .map { lst ->
+            def args = [:]
+            lst.each { it -> args = args + it }
+            def args_keys = args.collect { k, _v -> k }
+            [args_keys]
+        }
+    def ch_caller_args_key = Channel.value(global_caller_args.collect { k, _v -> k })
+    def ch_log_header = ch_ibdcall_input
+        .take(1)
+        .combine(ch_sim_args_keys)
+        .combine(ch_caller_args_key)
+        .map { _label, _chrno, _sim_args, _vcf_or_tree, sim_args_keys, caller_args_keys ->
+            ["label", "chrno"] + sim_args_keys + ["caller"] + caller_args_keys
+        }
+    def ch_log_values = ch_ibdcall_input
+        .combine(ch_sim_args_keys)
+        .combine { ch_caller_args_key }
+        .map { label, chrno, sim_args, _vcf_or_tree, sim_args_keys, caller_args_keys ->
+            def sim_args_values = sim_args_keys.collect { k -> sim_args[k] }
+            def caller_args_values = caller_args_keys.collect { k -> global_caller_args[k] }
+            [label, chrno] + sim_args_values + [caller] + caller_args_values
+        }
+
+    def out_file = file(launchDir).resolve(params.resdir) / filename
+
+    ch_log_header
+        .concat(ch_log_values)
+        .map { it.join("\t") }
+        .collectFile(name: out_file, newLine: true, sort: false)
+}
+
+def log_ibdcall_csp_params(ch_ibdcall_csp_input, filename) {
+    // find all keys across items
+    def ch_sim_args_keys = ch_ibdcall_csp_input
+        .map { _label, _chrno, sim_args, _vcf, _caller, _csp_id, _csp_args -> sim_args }
+        .collect()
+        .map { lst ->
+            def args = [:]
+            lst.each { it -> args = args + it }
+            def args_keys = args.collect { k, _v -> k }
+            [args_keys]
+        }
+    def ch_csp_args_keys = ch_ibdcall_csp_input
+        .map { _label, _chrno, _sim_args, _vcf, _caller, _csp_id, csp_args -> csp_args }
+        .collect()
+        .map { lst ->
+            def args = [:]
+            lst.each { it -> args = args + it }
+            def args_keys = args.collect { k, _v -> k }
+            [args_keys]
+        }
+    def ch_log_header = ch_ibdcall_csp_input
+        .take(1)
+        .combine(ch_sim_args_keys)
+        .combine(ch_csp_args_keys)
+        .map { _label, _chrno, _sim_args, _vcf, _caller, _csp_id, _csp_args, sim_args_keys, csp_args_keys ->
+            ["label", "chrno"] + sim_args_keys + ["caller", "csp_id"] + csp_args_keys
+        }
+    def ch_log_values = ch_ibdcall_csp_input
+        .combine(ch_sim_args_keys)
+        .combine(ch_csp_args_keys)
+        .map { label, chrno, sim_args, _vcf, caller, csp_id, csp_args, sim_args_keys, csp_args_keys ->
+            def sim_args_values = sim_args_keys.collect { k -> sim_args[k] }
+            def csp_args_values = csp_args_keys.collect { k -> csp_args[k] }
+            [label, chrno] + sim_args_values + [caller, csp_id] + csp_args_values
+        }
+
+    def out_file = file(launchDir).resolve(params.resdir) / filename
+
+    print(out_file)
+    ch_log_header
+        .concat(ch_log_values)
+        .map { it.join("\t") }
+        .collectFile(name: out_file, newLine: true, sort: false)
 }
