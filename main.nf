@@ -445,6 +445,12 @@ workflow PARAM_OPTIMIZATION {
             uk: label.startsWith("uk_")
         }
 
+    // //////////////////////////////////////////
+    // log simulation parameters
+    log_sim_params(ch_input.sp, "param_optimization_sp_set.params.tsv")
+    log_sim_params(ch_input.mp, "param_optimization_mp_set.params.tsv")
+    log_sim_params(ch_input.uk, "param_optimization_uk_set.params.tsv")
+
     /////////////////////////////////////////////////////
     // simulations and conat vcf/tree results
     SIM_SP_CHR(ch_input.sp)
