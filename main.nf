@@ -1659,7 +1659,7 @@ def log_ibdcall_params(ch_ibdcall_input, caller, filename) {
             def args_keys = args.collect { k, _v -> k }
             [args_keys]
         }
-    def ch_caller_args_key = Channel.value(global_caller_args.collect { k, _v -> k })
+    def ch_caller_args_key = Channel.value([global_caller_args.collect { k, _v -> k }])
     def ch_log_header = ch_ibdcall_input
         .take(1)
         .combine(ch_sim_args_keys)
@@ -1669,7 +1669,7 @@ def log_ibdcall_params(ch_ibdcall_input, caller, filename) {
         }
     def ch_log_values = ch_ibdcall_input
         .combine(ch_sim_args_keys)
-        .combine { ch_caller_args_key }
+        .combine(ch_caller_args_key)
         .map { label, chrno, sim_args, _vcf_or_tree, sim_args_keys, caller_args_keys ->
             def sim_args_values = sim_args_keys.collect { k -> sim_args[k] }
             def caller_args_values = caller_args_keys.collect { k -> global_caller_args[k] }
