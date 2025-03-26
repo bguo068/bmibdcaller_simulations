@@ -5,7 +5,7 @@ conda activate bmibdcaller_simulations
 
 # modify this to a path that you have write permission
 SCRATCHDIR=/local/scratch/bing/
-PIPELINEDIR=/local/chib/toconnor_grp/bing/
+PIPELINEDIR=/local/chib/toconnor_grp/bing/bmibdcaller_simulations
 
 
 mkdir -p ${SCRATCHDIR}/bmibdcaller_simulations/simulations/r240116/
