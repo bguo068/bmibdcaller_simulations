@@ -117,25 +117,12 @@ workflow WF_SP {
 
     def sp_sets = get_sp_sets()
 
-    // *********************** Log Params *************************
-    def sp_set_args_keys = sp_sets.collect { _k, v -> v }[0].collect { k, _v -> k }
 
+    // ***********************Simulation *************************
     ch_sp_sets = Channel.fromList(sp_sets.collect { label, args -> [label, args] })
     if (params.test) {
         ch_sp_sets = ch_sp_sets.take(1)
     }
-
-    Channel
-        .value(['label'] + sp_set_args_keys)
-        .concat(
-            ch_sp_sets.map { k, args ->
-                [k] + sp_set_args_keys.collect { i -> args[i] }
-            }
-        )
-        .map { lst -> lst.join("\t") }
-        .collectFile(name: "sp_sets.tsv", newLine: true, storeDir: params.resdir, sort: false)
-
-    // ***********************Simulation *************************
 
     ch_chrs = Channel.fromList(1..params.nchroms)
 
@@ -144,6 +131,9 @@ workflow WF_SP {
         .map { label, args, chrno -> [label, chrno, args] }
 
     SIM_SP_CHR(ch_sp_input)
+
+    // *********************** Log Params *************************
+    log_sim_params(ch_sp_input, "sp_sp_sets.params.tsv")
 
 
     // *********************** Call ibd *************************
@@ -172,6 +162,13 @@ workflow WF_SP {
     CALL_IBD_TPBWT(ch_in_ibdcall_vcf)
     CALL_IBD_HMMIBD(ch_in_ibdcall_vcf)
     CALL_IBD_ISORELATE(ch_in_ibdcall_vcf)
+
+    // ********************* Log IBD call parameters ************ 
+    log_ibdcall_params(ch_in_ibdcall_vcf, "hapibd", "sp_hapibd.params.tsv")
+    log_ibdcall_params(ch_in_ibdcall_vcf, "refinedibd", "sp_refinedibd.params.tsv")
+    log_ibdcall_params(ch_in_ibdcall_vcf, "tpbwt", "sp_tpbwt.params.tsv")
+    log_ibdcall_params(ch_in_ibdcall_vcf, "hmmibd", "sp_hmmibd.params.tsv")
+    log_ibdcall_params(ch_in_ibdcall_vcf, "isorelate", "sp_isorelate.params.tsv")
 
     // collect IBD and groupby simulation label and ibdcaller
     ch_out_ibd_grp = CALL_IBD_HAPIBD.out.ibd
