@@ -1064,7 +1064,7 @@ process CALL_IBD_TPBWT {
     """
 
     stub:
-    """touch ${args.genome_set_id}_${chrno}_tpbwt.ibd"""
+    """touch ${args.genome_set_id}_${chrno}_tpbwt.ibd time_output.txt"""
 }
 
 process CALL_IBD_HMMIBD {
