@@ -1586,7 +1586,7 @@ def get_sp_sets() {
     def sp_sets = [
         sp_neu: params.sp_defaults + [s: 0.0, genome_set_id: 10000]
     ]
-    if (params.params.sp_sets_json != "") {
+    if (params.sp_sets_json != "") {
         sp_sets = read_param_from_json(params.sp_sets_json)
     }
     return sp_sets
