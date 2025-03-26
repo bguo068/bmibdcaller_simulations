@@ -581,6 +581,11 @@ workflow WF_VARY_RECOM_RATE {
         .combine(Channel.fromList(1..nchroms))
         .map { label, args, chrno -> [label, chrno, args] }
 
+
+    /////////////////////////////////////////////////////
+    // log simulation parameters
+    log_sim_params(ch_input, "vary_recom_rate_sp_sets.params.tsv")
+
     /////////////////////////////////////////////////////
     // simulations and conat vcf/tree results
     SIM_SP_CHR(ch_input)
@@ -627,6 +632,14 @@ workflow WF_VARY_RECOM_RATE {
     CALL_IBD_ISORELATE_PARAM(ch_callibd.isorelate)
     CALL_IBD_REFINEDIBD_PARAM(ch_callibd.refinedibd)
     CALL_IBD_TPBWT_PARAM(ch_callibd.tpbwt)
+
+    // Log params
+    log_ibdcall_csp_params(ch_callibd.hapibd, "vary_recom_rate_hapibd.params.tsv")
+    log_ibdcall_csp_params(ch_callibd.hmmibd, "vary_recom_rate_hmmibd.params.tsv")
+    log_ibdcall_csp_params(ch_callibd.isorelate, "vary_recom_rate_isorelate.params.tsv")
+    log_ibdcall_csp_params(ch_callibd.refinedibd, "vary_recom_rate_refinedibd.params.tsv")
+    log_ibdcall_csp_params(ch_callibd.tpbwt, "vary_recom_rate_tpbwt.params.tsv")
+
 
     ch_inferred_ibd = CALL_IBD_HAPIBD_PARAM.out
         .mix(CALL_IBD_HMMIBD_PARAM.out)
