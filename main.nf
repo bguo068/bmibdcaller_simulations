@@ -677,29 +677,20 @@ workflow WF_VARY_RECOM_RATE {
 
 workflow WF_SP_COMPUTATION_BENCH {
 
-    def sp_sets = get_sp_sets()
-
-    // *********************** Log Params *************************
-    def sp_set_args_keys = sp_sets.collect { _k, v -> v }[0].collect { k, _v -> k }
-    ch_sp_sets = Channel.fromList(sp_sets.collect { label, args -> [label, args] })
-
-    Channel
-        .value(['label'] + sp_set_args_keys)
-        .concat(
-            ch_sp_sets.map { k, args ->
-                [k] + sp_set_args_keys.collect { i -> args[i] }
-            }
-        )
-        .map { lst -> lst.join("\t") }
-        .collectFile(name: "sp_sets.tsv", newLine: true, storeDir: params.resdir, sort: false)
 
     // ***********************Simulation *************************
 
+    def sp_sets = get_sp_sets()
+    ch_sp_sets = Channel.fromList(sp_sets.collect { label, args -> [label, args] })
     ch_chrs = Channel.fromList(1..params.nchroms)
 
     ch_sp_input = ch_sp_sets
         .combine(ch_chrs)
         .map { label, args, chrno -> [label, chrno, args] }
+
+    // *********************** Log Simulation Params *************************
+    log_sim_params(ch_sp_input, "sp_computation_bench_sp_sets.params.tsv")
+
 
     SIM_SP_CHR(ch_sp_input)
 
@@ -723,13 +714,22 @@ workflow WF_SP_COMPUTATION_BENCH {
         CALL_IBD_REFINEDIBD(ch_in_ibdcall_vcf)
         CALL_IBD_TPBWT(ch_in_ibdcall_vcf)
         CALL_IBD_HMMIBD(ch_in_ibdcall_vcf)
-        CALL_IBD_HMMIBDRS(ch_in_ibdcall_vcf)
+        // CALL_IBD_HMMIBDRS(ch_in_ibdcall_vcf)
         CALL_IBD_ISORELATE(ch_in_ibdcall_vcf)
     }
     else {
         CALL_IBD_HAPIBD(ch_in_ibdcall_vcf)
         // CALL_IBD_TSKIBD(ch_in_ibdcall_trees)
         CALL_IBD_REFINEDIBD(ch_in_ibdcall_vcf)
+    }
+
+    // *********************** Log IBD calling Params *************************
+    log_ibdcall_params(ch_in_ibdcall_vcf, "hapibd", "sp_computation_bench_hapibd.params.tsv")
+    log_ibdcall_params(ch_in_ibdcall_vcf, "refinedibd", "sp_computation_bench_refined.params.tsv")
+    if (params.compute_bench_large_size == 0) {
+        log_ibdcall_params(ch_in_ibdcall_vcf, "tpbwt", "sp_computation_bench_tpbwt.params.tsv")
+        log_ibdcall_params(ch_in_ibdcall_vcf, "hmmibd", "sp_computation_bench_hmmibd.params.tsv")
+        log_ibdcall_params(ch_in_ibdcall_vcf, "isorelate", "sp_computation_bench_isorelate.params.tsv")
     }
 }
 workflow THIN_MARKER {
