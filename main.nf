@@ -274,27 +274,13 @@ workflow WF_SP {
 workflow WF_MP {
     main:
 
-    def mp_sets = get_mp_sets()
-    // *********************** Log params ************************
-    def mp_set_args_keys = mp_sets.collect { _k, v -> v }[0].collect { k, _v -> k }
 
+    // ***********************Simulation *************************
+    def mp_sets = get_mp_sets()
     ch_mp_sets = Channel.fromList(mp_sets.collect { label, args -> [label, args] })
     if (params.test) {
         ch_mp_sets = ch_mp_sets.take(1)
     }
-
-    Channel
-        .value(['label'] + mp_set_args_keys)
-        .concat(
-            ch_mp_sets.map { k, args ->
-                [k] + mp_set_args_keys.collect { i -> args[i] }
-            }
-        )
-        .map { lst -> lst.join("\t") }
-        .collectFile(name: "mp_sets.tsv", newLine: true, storeDir: params.resdir, sort: false)
-
-
-    // ***********************Simulation *************************
 
     ch_chrs = Channel.fromList(1..params.nchroms)
 
@@ -303,6 +289,9 @@ workflow WF_MP {
         .map { label, args, chrno -> [label, chrno, args] }
 
     SIM_MP_CHR(ch_mp_input)
+
+    // *********************** Log params ************************
+    log_sim_params(ch_mp_input, "mp_mp_sets.params.tsv")
 
 
     // *********************** Call ibd *************************
@@ -334,6 +323,13 @@ workflow WF_MP {
     CALL_IBD_TPBWT(ch_in_ibdcall_vcf)
     CALL_IBD_HMMIBD(ch_in_ibdcall_vcf)
     CALL_IBD_ISORELATE(ch_in_ibdcall_vcf)
+
+    // ********************* Log IBD call parameters ************ 
+    log_ibdcall_params(ch_in_ibdcall_vcf, "hapibd", "mp_hapibd.params.tsv")
+    log_ibdcall_params(ch_in_ibdcall_vcf, "refinedibd", "mp_refinedibd.params.tsv")
+    log_ibdcall_params(ch_in_ibdcall_vcf, "tpbwt", "mp_tpbwt.params.tsv")
+    log_ibdcall_params(ch_in_ibdcall_vcf, "hmmibd", "mp_hmmibd.params.tsv")
+    log_ibdcall_params(ch_in_ibdcall_vcf, "isorelate", "mp_isorelate.params.tsv")
 
     // collect IBD and groupby simulation label and ibdcaller
     ch_out_ibd_grp = CALL_IBD_HAPIBD.out.ibd
