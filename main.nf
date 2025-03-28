@@ -1,5 +1,11 @@
 nextflow.enable.dsl = 2
 
+// this is used to ensure that each process does not use more memory than declared.
+// it uses ulimit -v and only works on Linux
+// Note for java programs, process memory usage is restricted via java ---Xmx regardless of 
+// the use_ulimit values
+params.use_ulimit = false
+
 params.test = false
 params.resdir = "res"
 
@@ -874,7 +880,7 @@ process SIM_SP_CHR {
         }
         .join(" ")
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
+    if ${params.use_ulimit}; then ulimit -v ${task.memory.toKilo().intdiv(100) * 90}; fi
     sim_single_pop.py ${cmd_options}
 
     mkdir tmp; mv tmp_* tmp/
@@ -912,7 +918,7 @@ process SIM_MP_CHR {
         }
         .join(" ")
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
+    if ${params.use_ulimit}; then ulimit -v ${task.memory.toKilo().intdiv(100) * 90}; fi
     sim_multiple_pop.py ${cmd_options}
 
     mkdir tmp; mv tmp_* tmp/
@@ -949,12 +955,11 @@ process CALL_IBD_HAPIBD {
         minextend: params.hapibd_minextend,
         minmarkers: params.hapibd_minmarkers,
         minmaf: params.minmaf,
-        mem_gb: task.memory.giga,
+        mem_gb: (task.memory.giga * 0.95).toInteger(),
         nthreads: task.cpus,
         genome_set_id: args.genome_set_id,
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     call_hapibd.py ${cmd_options}
     """
 
@@ -983,7 +988,7 @@ process CALL_IBD_TSKIBD {
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
 
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
+    if ${params.use_ulimit}; then ulimit -v ${task.memory.toKilo().intdiv(100) * 90}; fi
     call_tskibd.py ${cmd_options_tskibd}
     """
 
@@ -1012,7 +1017,7 @@ process CALL_IBD_REFINEDIBD {
         lod: params.refinedibd_lod,
         length: params.refinedibd_length,
         scale: params.refinedibd_scale,
-        mem_gb: task.memory.giga,
+        mem_gb: (task.memory.giga * 0.95).toInteger(),
         minmaf: params.minmaf,
         window: params.refinedibd_window,
         trim: params.refinedibd_trim,
@@ -1020,7 +1025,6 @@ process CALL_IBD_REFINEDIBD {
         genome_set_id: args.genome_set_id,
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     call_refinedibd.py ${cmd_options}
     """
 
@@ -1093,7 +1097,7 @@ process CALL_IBD_HMMIBD {
         version: params.hmmibd_version,
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
+    if ${params.use_ulimit}; then ulimit -v ${task.memory.toKilo().intdiv(100) * 90}; fi
         call_hmmibd.py ${cmd_options}
         """
 
@@ -1130,7 +1134,7 @@ process CALL_IBD_HMMIBDRS {
         optimize_for_large_size: args.optimize_for_large_size ?: 0,
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
+    if ${params.use_ulimit}; then ulimit -v ${task.memory.toKilo().intdiv(100) * 90}; fi
         call_hmmibd.py ${cmd_options}
         """
 
@@ -1164,7 +1168,7 @@ process CALL_IBD_ISORELATE {
         genome_set_id: args.genome_set_id,
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
+    if ${params.use_ulimit}; then ulimit -v ${task.memory.toKilo().intdiv(100) * 90}; fi
     call_isorelate.py ${cmd_options} --cpus ${task.cpus}
     """
 
@@ -1209,7 +1213,6 @@ process PROC_DIST_NE {
         ibdne_no_diploid_conversion: params.ibdne_no_diploid_convertion,
     ]).collect { k, v -> "--${k} ${v}" }.join(" ")
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     proc_dist_ne.py ${args_local} 
     """
 
@@ -1244,7 +1247,7 @@ process PROC_INFOMAP {
         peak_validate_meth: params.peak_validate_meth,
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
+    if ${params.use_ulimit}; then ulimit -v ${task.memory.toKilo().intdiv(100) * 90}; fi
     proc_infomap.py ${args_local}
     """
 
@@ -1267,7 +1270,7 @@ process RUN_IBDNE {
 
     script:
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
+    if ${params.use_ulimit}; then ulimit -v ${task.memory.toKilo().intdiv(100) * 90}; fi
     bash ${ibdne_sh}
     """
 
@@ -1300,7 +1303,7 @@ process RUN_INFOMAP {
         transform: params.ifm_transform,
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
+    if ${params.use_ulimit}; then ulimit -v ${task.memory.toKilo().intdiv(100) * 90}; fi
     run_infomap.py ${args_local}
     """
 
@@ -1337,7 +1340,7 @@ process SIM_UK_CHR {
         .collect { k, v -> "--${k} ${v}" }
         .join(" ")
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
+    if ${params.use_ulimit}; then ulimit -v ${task.memory.toKilo().intdiv(100) * 90}; fi
     sim_uk_pop.py ${cmd_options}
     mkdir tmp; mv tmp_* tmp/
     """
@@ -1374,12 +1377,11 @@ process CALL_IBD_HAPIBD_PARAM {
         r: args.r,
         chrno: chrno,
         seqlen: args.seqlen,
-        mem_gb: task.memory.giga,
+        mem_gb: (task.memory.giga * 0.95).toInteger(),
         nthreads: task.cpus,
         genome_set_id: args.genome_set_id,
     ]).collect { k, v -> "--${k} ${v}" }.join(" ")
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     call_hapibd.py ${cmd_options}
     """
 
@@ -1416,7 +1418,7 @@ process CALL_IBD_TPBWT_PARAM {
         genome_set_id: args.genome_set_id,
     ]).collect { k, v -> "--${k} ${v}" }.join(" ")
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
+    if ${params.use_ulimit}; then ulimit -v ${task.memory.toKilo().intdiv(100) * 90}; fi
     /usr/bin/time \
     call_tpbwt.py ${cmd_options} 2>time_output.txt
     cat tmp_time_output.txt >> time_output.txt 
@@ -1449,12 +1451,11 @@ process CALL_IBD_REFINEDIBD_PARAM {
         r: args.r,
         seqlen: args.seqlen,
         chrno: chrno,
-        mem_gb: task.memory.giga,
+        mem_gb: (task.memory.giga * 0.95).toInteger(),
         nthreads: task.cpus,
         genome_set_id: args.genome_set_id,
     ]).collect { k, v -> "--${k} ${v}" }.join(" ")
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     call_refinedibd.py ${cmd_options}
     """
 
@@ -1488,7 +1489,7 @@ process CALL_IBD_HMMIBD_PARAM {
         version: params.hmmibd_version,
     ]).collect { k, v -> "--${k} ${v}" }.join(" ")
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
+    if ${params.use_ulimit}; then ulimit -v ${task.memory.toKilo().intdiv(100) * 90}; fi
         call_hmmibd.py ${cmd_options}
         """
 
@@ -1522,7 +1523,7 @@ process CALL_IBD_ISORELATE_PARAM {
         genome_set_id: args.genome_set_id,
     ]).collect { k, v -> "--${k} ${v}" }.join(" ")
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
+    if ${params.use_ulimit}; then ulimit -v ${task.memory.toKilo().intdiv(100) * 90}; fi
     call_isorelate.py ${cmd_options} --cpus ${task.cpus}
     """
 
@@ -1552,7 +1553,7 @@ process CMP_IBD {
         inferredibd_dir: "inferredibd_dir",
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
-    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
+    if ${params.use_ulimit}; then ulimit -v ${task.memory.toKilo().intdiv(100) * 90}; fi
     cmp_ibd.py ${cmd_args}
     """
 
