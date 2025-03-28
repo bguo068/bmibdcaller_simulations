@@ -874,6 +874,7 @@ process SIM_SP_CHR {
         }
         .join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     sim_single_pop.py ${cmd_options}
 
     mkdir tmp; mv tmp_* tmp/
@@ -911,6 +912,7 @@ process SIM_MP_CHR {
         }
         .join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     sim_multiple_pop.py ${cmd_options}
 
     mkdir tmp; mv tmp_* tmp/
@@ -952,6 +954,7 @@ process CALL_IBD_HAPIBD {
         genome_set_id: args.genome_set_id,
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     call_hapibd.py ${cmd_options}
     """
 
@@ -980,6 +983,7 @@ process CALL_IBD_TSKIBD {
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
 
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     call_tskibd.py ${cmd_options_tskibd}
     """
 
@@ -1016,6 +1020,7 @@ process CALL_IBD_REFINEDIBD {
         genome_set_id: args.genome_set_id,
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     call_refinedibd.py ${cmd_options}
     """
 
@@ -1051,6 +1056,7 @@ process CALL_IBD_TPBWT {
         genome_set_id: args.genome_set_id,
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     /usr/bin/time \
     call_tpbwt.py ${cmd_options} 2>time_output.txt
     cat tmp_time_output.txt >> time_output.tx
@@ -1087,6 +1093,7 @@ process CALL_IBD_HMMIBD {
         version: params.hmmibd_version,
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
         call_hmmibd.py ${cmd_options}
         """
 
@@ -1123,6 +1130,7 @@ process CALL_IBD_HMMIBDRS {
         optimize_for_large_size: args.optimize_for_large_size ?: 0,
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
         call_hmmibd.py ${cmd_options}
         """
 
@@ -1156,6 +1164,7 @@ process CALL_IBD_ISORELATE {
         genome_set_id: args.genome_set_id,
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     call_isorelate.py ${cmd_options} --cpus ${task.cpus}
     """
 
@@ -1200,6 +1209,7 @@ process PROC_DIST_NE {
         ibdne_no_diploid_conversion: params.ibdne_no_diploid_convertion,
     ]).collect { k, v -> "--${k} ${v}" }.join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     proc_dist_ne.py ${args_local} 
     """
 
@@ -1234,6 +1244,7 @@ process PROC_INFOMAP {
         peak_validate_meth: params.peak_validate_meth,
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     proc_infomap.py ${args_local}
     """
 
@@ -1256,6 +1267,7 @@ process RUN_IBDNE {
 
     script:
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     bash ${ibdne_sh}
     """
 
@@ -1288,6 +1300,7 @@ process RUN_INFOMAP {
         transform: params.ifm_transform,
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     run_infomap.py ${args_local}
     """
 
@@ -1324,6 +1337,7 @@ process SIM_UK_CHR {
         .collect { k, v -> "--${k} ${v}" }
         .join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     sim_uk_pop.py ${cmd_options}
     mkdir tmp; mv tmp_* tmp/
     """
@@ -1365,6 +1379,7 @@ process CALL_IBD_HAPIBD_PARAM {
         genome_set_id: args.genome_set_id,
     ]).collect { k, v -> "--${k} ${v}" }.join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     call_hapibd.py ${cmd_options}
     """
 
@@ -1401,6 +1416,7 @@ process CALL_IBD_TPBWT_PARAM {
         genome_set_id: args.genome_set_id,
     ]).collect { k, v -> "--${k} ${v}" }.join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     /usr/bin/time \
     call_tpbwt.py ${cmd_options} 2>time_output.txt
     cat tmp_time_output.txt >> time_output.txt 
@@ -1438,6 +1454,7 @@ process CALL_IBD_REFINEDIBD_PARAM {
         genome_set_id: args.genome_set_id,
     ]).collect { k, v -> "--${k} ${v}" }.join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     call_refinedibd.py ${cmd_options}
     """
 
@@ -1471,6 +1488,7 @@ process CALL_IBD_HMMIBD_PARAM {
         version: params.hmmibd_version,
     ]).collect { k, v -> "--${k} ${v}" }.join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
         call_hmmibd.py ${cmd_options}
         """
 
@@ -1504,6 +1522,7 @@ process CALL_IBD_ISORELATE_PARAM {
         genome_set_id: args.genome_set_id,
     ]).collect { k, v -> "--${k} ${v}" }.join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     call_isorelate.py ${cmd_options} --cpus ${task.cpus}
     """
 
@@ -1533,6 +1552,7 @@ process CMP_IBD {
         inferredibd_dir: "inferredibd_dir",
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
+    ulimit -m ${task.memory.toKilo().intdiv(100) * 90} 
     cmp_ibd.py ${cmd_args}
     """
 
