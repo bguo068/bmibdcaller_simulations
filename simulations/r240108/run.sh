@@ -5,6 +5,7 @@ set -eEx -o pipefail
 SCRATCHDIR=/local/scratch/bing/
 PIPELINEDIR=/local/chib/toconnor_grp/bing/bmibdcaller_simulations/
 
+source ~/conda_devel.sh
 conda activate bmibdcaller_simulations
 
 mkdir -p ${SCRATCHDIR}/bmibdcaller_simulations/simulations/r240108/
@@ -12,6 +13,19 @@ cd  ${SCRATCHDIR}/bmibdcaller_simulations/simulations/r240108/
 
 # generate json files
 python3 ${PIPELINEDIR}/simulations/r240108/gen_sets_json.py
+
+# workaround with https://github.com/It4innovations/hyperqueue/issues/789
+export NXF_VER=24.10.2
+# also make sure using hq version 0.17.0
+
+## lauch hq worker via
+## in a login/compute node: 
+# hq server start
+## in another shell of the login node
+# source ~/conda_devel.sh
+# conda activate bmibdcaller_simulations
+# sbatch -n 30 --mem=100g --export=ALL --time 24:00:00 --wrap="hq worker start --cpus 30 --resource 'mem=sum(102400)' " # run multiple time to get more workers
+
 
 # optimized 
 # with different values for the mincm parameter for IBDne and 
