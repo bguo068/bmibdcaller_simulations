@@ -1554,6 +1554,7 @@ process CMP_IBD {
     ].collect { k, v -> "--${k} ${v}" }.join(" ")
     """
     if ${params.use_ulimit}; then ulimit -v ${task.memory.toKilo().intdiv(100) * 90}; fi
+    export RAYON_NUM_THREADS=${task.cpus}
     cmp_ibd.py ${cmd_args}
     """
 
