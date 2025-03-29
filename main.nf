@@ -426,12 +426,24 @@ workflow PARAM_OPTIMIZATION {
     /////////////////////////////////////////////////////
     // models
     // - read models from json file
+    // note if model parameters are the same except  genome_set_id that those are replicates for each other
+    // genome_set_id will be use determine the seeds for simulations 
     def models = [
         "sp_neu": params.sp_defaults + [s: 0.0, genome_set_id: 10000],
+        "sp_neub": params.sp_defaults + [s: 0.0, genome_set_id: 10010],
+        "sp_neuc": params.sp_defaults + [s: 0.0, genome_set_id: 10020],
         "mp_neu": params.mp_defaults + [s: 0.0, genome_set_id: 20000],
+        "mp_neub": params.mp_defaults + [s: 0.0, genome_set_id: 20010],
+        "mp_neuc": params.mp_defaults + [s: 0.0, genome_set_id: 20020],
         "uk_human": [seqlen: 60000000, gc: 0, r: 1E-8, u: 1.00E-8, nsam: 1000, genome_set_id: 60001],
+        "uk_humanb": [seqlen: 60000000, gc: 0, r: 1E-8, u: 1.00E-8, nsam: 1000, genome_set_id: 60011],
+        "uk_humanc": [seqlen: 60000000, gc: 0, r: 1E-8, u: 1.00E-8, nsam: 1000, genome_set_id: 60021],
         "uk_human2": [seqlen: 60000000, gc: 0, r: 1E-8, u: 1.38E-8, nsam: 1000, genome_set_id: 70001],
+        "uk_human2b": [seqlen: 60000000, gc: 0, r: 1E-8, u: 1.38E-8, nsam: 1000, genome_set_id: 70011],
+        "uk_human2c": [seqlen: 60000000, gc: 0, r: 1E-8, u: 1.38E-8, nsam: 1000, genome_set_id: 70021],
         "uk_pf": [seqlen: 900000, gc: 0, r: 6.6666667E-7, u: 1E-8, nsam: 1000, genome_set_id: 60003],
+        "uk_pfb": [seqlen: 900000, gc: 0, r: 6.6666667E-7, u: 1E-8, nsam: 1000, genome_set_id: 60013],
+        "uk_pfc": [seqlen: 900000, gc: 0, r: 6.6666667E-7, u: 1E-8, nsam: 1000, genome_set_id: 60023],
     ]
     // prepare model input chanel
     ch_input = Channel
