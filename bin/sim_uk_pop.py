@@ -266,16 +266,35 @@ def write_peudo_homozygous_vcf(ts_mutated, chrno, out_vcf):
     df2 = pd.DataFrame(gt_list)
     # sample names are in the format of "tsk_{n}"
     df2.columns = [f"tsk_{n}" for n in df2.columns]
-    df2 = df2.astype(str)
-    df2 = df2 + "|" + df2
 
-    # combine variant info with gt infor
-    df = pd.concat([df1.reset_index(drop=True), df2.reset_index(drop=True)], axis=1)
 
+    # NOTE: this step tmp = tmp + "|" + tmp tend to fail often due memory allocation issue
+    # do this in small chunks to avoid the issues
+    step = 1000
+    i = 0
+    N = df2.shape[0] 
     # write
     with gzip.open(out_vcf, "wt") as f:
         f.write(header)
-        df.to_csv(f, sep="\t", header=True, index=False)
+        while i < N :
+            j = i + step
+            if j > N:
+                j = N 
+            tmp2 = df2.iloc[i:j, :]
+            tmp2 = tmp2.astype(str)
+            tmp2 = (tmp2 + "|" + tmp2).reset_index(drop=True)
+            tmp1 = df1.iloc[i:j, :].reset_index(drop=True)
+
+            # combine variant info with gt infor
+            df = pd.concat([tmp1, tmp2], axis=1)
+
+            if i == 0:
+                # write header at the first chunk
+                df.to_csv(f, sep="\t", header=True, index=False)
+            else:
+                df.to_csv(f, sep="\t", header=False, index=False)
+            i = j
+
 
 
 if __name__ == "__main__":
