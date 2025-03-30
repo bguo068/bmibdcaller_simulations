@@ -501,8 +501,8 @@ workflow PARAM_OPTIMIZATION {
         .combine(ch_csp)
         .branch { label, _chrno, _args, _vcf, caller, _csp_id, _csp_args ->
             hapibd: caller == "hapibd"
-            hmmibd: caller == "hmmibd" && (label != "uk_human") && (label != "uk_human2")
-            isorelate: caller == "isorelate" && (label != "uk_human") && (label != "uk_human2")
+            hmmibd: caller == "hmmibd" && (!label.startsWith("uk_human"))
+            isorelate: caller == "isorelate" && (!label.startsWith("uk_human"))
             refinedibd: caller == "refinedibd"
             tpbwt: caller == "tpbwt"
             other: true
