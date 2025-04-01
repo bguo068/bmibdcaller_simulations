@@ -40,9 +40,9 @@ MP_DEFAULTS = dict(
 def downstream():
     parms_dict = dict(  # single  population
         sp_neu=SP_DEFAULTS | dict(s=0.0, genome_set_id=10000),
-        sp_s01=SP_DEFAULTS | dict(s=0.1, genome_set_id=10001),
+        sp_s02b=SP_DEFAULTS | dict(s=0.2, genome_set_id=10001),
         sp_s02=SP_DEFAULTS | dict(s=0.2, genome_set_id=10002),
-        sp_s03=SP_DEFAULTS | dict(s=0.3, genome_set_id=10003),
+        sp_s02c=SP_DEFAULTS | dict(s=0.2, genome_set_id=10003),
         # added repeats for genome_set_id = 10000
         sp_neub=SP_DEFAULTS | dict(s=0.0, genome_set_id=10010),
         sp_neuc=SP_DEFAULTS | dict(s=0.0, genome_set_id=10020),

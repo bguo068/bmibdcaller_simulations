@@ -15,8 +15,8 @@ cd  ${SCRATCHDIR}/bmibdcaller_simulations/simulations/r240108/
 python3 ${PIPELINEDIR}/simulations/r240108/gen_sets_json.py
 
 # workaround with https://github.com/It4innovations/hyperqueue/issues/789
-export NXF_VER=24.10.2
-# also make sure using hq version 0.17.0
+export NXF_VER=25.02.1-edge
+# also make sure using hq version 0.22.0
 
 ## lauch hq worker via
 ## in a login/compute node: 
@@ -38,7 +38,8 @@ nextflow \
     --mp_sets_json mp_sets.json \
     --ibdne_mincm 2 \
     --filt_ibd_by_ov false \
-    --resdir res_ibdnemincm2 && \
+    --resdir res_ibdnemincm2 \
+    --use_ulimit true && \
 nextflow \
     ${PIPELINEDIR}/main.nf \
     -resume -profile hq \
@@ -46,7 +47,8 @@ nextflow \
     --mp_sets_json mp_sets.json \
     --ibdne_mincm 4 \
     --filt_ibd_by_ov false \
-    --resdir res_ibdnemincm4 && \
+    --resdir res_ibdnemincm4 \
+    --use_ulimit true && \
 nextflow \
     ${PIPELINEDIR}/main.nf \
     -resume -profile hq \
@@ -54,7 +56,8 @@ nextflow \
     --mp_sets_json mp_sets.json \
     --ibdne_mincm 2 \
     --filt_ibd_by_ov true \
-    --resdir res_ibdnemincm2_filtov && \
+    --resdir res_ibdnemincm2_filtov \
+    --use_ulimit true && \
 nextflow \
     ${PIPELINEDIR}/main.nf \
     -resume -profile hq \
@@ -62,9 +65,8 @@ nextflow \
     --mp_sets_json mp_sets.json \
     --ibdne_mincm 4 \
     --filt_ibd_by_ov true \
-    --resdir res_ibdnemincm4_filtov
-
-# unoptimized
+    --resdir res_ibdnemincm4_filtov \
+    --use_ulimit true  && \
 nextflow \
     ${PIPELINEDIR}/main.nf \
     -resume -profile hq \
@@ -90,4 +92,5 @@ nextflow \
     --refinedibd_window  40.0 \
     --tpbwt_template_opts 0 \
     --tpbwt_Lm 300 \
-    --tpbwt_Lf 2.0 
+    --tpbwt_Lf 2.0 \
+    --use_ulimit true 
