@@ -74,6 +74,7 @@ my_ibd <- getIBDsegments(ped.genotypes = my_genotypes,
                          minimum.snps = {min_snp},
                          minimum.length.bp = {min_len_bp},
                          error = 0.001)
+write.table(my_ibd, "raw.ibd", sep='\t', quote=F, row.names=F)
 # reformat
 my_ibd <- my_ibd[c('iid1', 'iid2', 'start_position_bp', 'end_position_bp')]
 colnames(my_ibd) <- c("Id1", "Id2", "Start", "End")
