@@ -1515,6 +1515,7 @@ process CALL_IBD_HMMIBD_PARAM {
     ]).collect { k, v -> "--${k} ${v}" }.join(" ")
     """
     if ${params.use_ulimit}; then ulimit -v ${task.memory.toKilo().intdiv(100) * 90}; fi
+        export RAYON_NUM_THREADS=${task.cpus}
         call_hmmibd.py ${cmd_options}
         """
 
