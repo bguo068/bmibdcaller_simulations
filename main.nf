@@ -574,15 +574,28 @@ workflow WF_VARY_RECOM_RATE {
     def sp_defaults = params.sp_defaults
     def models = [
         "sp_neu_0003": sp_defaults + [s: 0.0, genome_set_id: 10000, r: 3E-9, seqlen: (1.0 / 3E-9).toInteger()],
-        "sp_neu_0010": sp_defaults + [s: 0.0, genome_set_id: 10000, r: 1.0E-8, seqlen: (1.0 / 1.0E-8).toInteger()],
-        "sp_neu_0030": sp_defaults + [s: 0.0, genome_set_id: 10000, r: 3.0E-8, seqlen: (1.0 / 3.0E-8).toInteger()],
-        "sp_neu_0100": sp_defaults + [s: 0.0, genome_set_id: 10000, r: 1.00E-7, seqlen: (1.0 / 1.00E-7).toInteger()],
-        "sp_neu_0300": sp_defaults + [s: 0.0, genome_set_id: 10000, r: 3.00E-7, seqlen: (1.0 / 3.00E-7).toInteger()],
-        "sp_neu_0667": sp_defaults + [s: 0.0, genome_set_id: 10000, r: 6.67E-7, seqlen: (1.0 / 6.67E-7).toInteger()],
-        "sp_neu_1000": sp_defaults + [s: 0.0, genome_set_id: 10000, r: 0.000001000, seqlen: (1.0 / 0.000001000).toInteger()],
+        "sp_neua_0003": sp_defaults + [s: 0.0, genome_set_id: 10002, r: 3E-9, seqlen: (1.0 / 3E-9).toInteger()],
+        "sp_neub_0003": sp_defaults + [s: 0.0, genome_set_id: 10003, r: 3E-9, seqlen: (1.0 / 3E-9).toInteger()],
+        "sp_neu_0010": sp_defaults + [s: 0.0, genome_set_id: 10004, r: 1.0E-8, seqlen: (1.0 / 1.0E-8).toInteger()],
+        "sp_neua_0010": sp_defaults + [s: 0.0, genome_set_id: 10005, r: 1.0E-8, seqlen: (1.0 / 1.0E-8).toInteger()],
+        "sp_neub_0010": sp_defaults + [s: 0.0, genome_set_id: 10006, r: 1.0E-8, seqlen: (1.0 / 1.0E-8).toInteger()],
+        "sp_neu_0030": sp_defaults + [s: 0.0, genome_set_id: 10007, r: 3.0E-8, seqlen: (1.0 / 3.0E-8).toInteger()],
+        "sp_neua_0030": sp_defaults + [s: 0.0, genome_set_id: 10008, r: 3.0E-8, seqlen: (1.0 / 3.0E-8).toInteger()],
+        "sp_neub_0030": sp_defaults + [s: 0.0, genome_set_id: 10009, r: 3.0E-8, seqlen: (1.0 / 3.0E-8).toInteger()],
+        "sp_neu_0100": sp_defaults + [s: 0.0, genome_set_id: 10010, r: 1.00E-7, seqlen: (1.0 / 1.00E-7).toInteger()],
+        "sp_neua_0100": sp_defaults + [s: 0.0, genome_set_id: 10011, r: 1.00E-7, seqlen: (1.0 / 1.00E-7).toInteger()],
+        "sp_neub_0100": sp_defaults + [s: 0.0, genome_set_id: 10012, r: 1.00E-7, seqlen: (1.0 / 1.00E-7).toInteger()],
+        "sp_neu_0300": sp_defaults + [s: 0.0, genome_set_id: 10013, r: 3.00E-7, seqlen: (1.0 / 3.00E-7).toInteger()],
+        "sp_neua_0300": sp_defaults + [s: 0.0, genome_set_id: 10014, r: 3.00E-7, seqlen: (1.0 / 3.00E-7).toInteger()],
+        "sp_neub_0300": sp_defaults + [s: 0.0, genome_set_id: 10015, r: 3.00E-7, seqlen: (1.0 / 3.00E-7).toInteger()],
+        "sp_neu_0667": sp_defaults + [s: 0.0, genome_set_id: 10016, r: 6.67E-7, seqlen: (1.0 / 6.67E-7).toInteger()],
+        "sp_neua_0667": sp_defaults + [s: 0.0, genome_set_id: 10017, r: 6.67E-7, seqlen: (1.0 / 6.67E-7).toInteger()],
+        "sp_neub_0667": sp_defaults + [s: 0.0, genome_set_id: 10018, r: 6.67E-7, seqlen: (1.0 / 6.67E-7).toInteger()],
+        "sp_neu_1000": sp_defaults + [s: 0.0, genome_set_id: 10019, r: 0.000001000, seqlen: (1.0 / 0.000001000).toInteger()],
+        "sp_neua_1000": sp_defaults + [s: 0.0, genome_set_id: 10020, r: 0.000001000, seqlen: (1.0 / 0.000001000).toInteger()],
+        "sp_neub_1000": sp_defaults + [s: 0.0, genome_set_id: 10021, r: 0.000001000, seqlen: (1.0 / 0.000001000).toInteger()],
     ]
 
-    models.each { }
     // prepare model input chanel
     def nchroms = 4
     // no need to be as large as params.nchrom
@@ -620,7 +633,7 @@ workflow WF_VARY_RECOM_RATE {
         .combine(ch_csp)
         .branch { _label, _chrno, args, _vcf, caller, _csp_id, _csp_args ->
             hapibd: caller == "hapibd"
-            hmmibd: caller == "hmmibd"
+            hmmibd: (caller == "hmmibd") && (args.r >= 1.00E-8)
             isorelate: (caller == "isorelate") && (args.r >= 1.00E-7)
             refinedibd: caller == "refinedibd"
             tpbwt: caller == "tpbwt"
