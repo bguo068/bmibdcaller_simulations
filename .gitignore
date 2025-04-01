@@ -3,14 +3,18 @@ testrun
 testdata/100_sing_pop_neu
 simulations/r230927
 simulations/r231226/*.json
-simulations/r231226/res
+simulations/r231226/res*
 simulations/r240108/*.json
 simulations/r240108/res*
 simulations/r240111_time_ram/res_*
 simulations/r240111_time_ram/*.json
+simulations/r240111_time_ram_new/**
 simulations/r240116/res
 simulations/backups
 bin/ibdutils
+*.tgz
+*.tar
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

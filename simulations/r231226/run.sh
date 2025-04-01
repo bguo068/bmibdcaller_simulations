@@ -15,7 +15,8 @@ cd ${SCRATCHDIR}/bmibdcaller_simulations/simulations/r231226
 python ${PIPELINEDIR}/simulations/r231226/gen_json.py 
 
 # workaround with https://github.com/It4innovations/hyperqueue/issues/789
-export NXF_VER=24.10.2
+# export NXF_VER=24.10.2
+export NXF_VER=25.02.1-edge
 # also make sure using hq version 0.17.0
 
 ## lauch hq worker via
@@ -25,6 +26,8 @@ export NXF_VER=24.10.2
 # source ~/conda_devel.sh
 # conda activate bmibdcaller_simulations
 # sbatch -n 30 --mem=100g --export=ALL --time 24:00:00 --wrap="hq worker start --cpus 30 --resource 'mem=sum(102400)' " # run multiple time to get more workers
+# sbatch -n 128 --mem=1024000m --export=ALL --time 96:00:00 --wrap="hq worker start --cpus 128 --resource 'mem=sum(1024000)' "
+
 
 # run the pipeline
 nextflow  \
