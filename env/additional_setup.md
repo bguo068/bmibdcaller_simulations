@@ -47,6 +47,7 @@
 ```bash
 	git clone https://github.com/23andMe/phasedibd.git
 	cd phasedibd
+	git checkout 9a7b9492b1024996cd5beadb863a7ed314d63077
 	python setup.py build_ext --inplace
 	python setup.py install
 	python tests/unit_tests.py
@@ -59,6 +60,7 @@
 	conda activate bmibdcaller_simulations
 	git clone https://github.com/bguo068/tskibd.git
 	cd tskibd
+	git checkout v0.0.2
 	git submodule update --init --recursive
 	meson build
 	ninja -C build tskibd
@@ -70,4 +72,16 @@
 	cd ..
 	cd ..
 	rm -rf tskibd
+```
+
+## setup ishare/ibdutils
+Refer to https://github.com/bguo068/ishare?tab=readme-ov-file#requirements
+```bash
+	git clone https://github.com/bguo068/ishare.git
+	cd ishare
+	git checkout v0.1.11
+	cargo build --release --bin ibdutils
+	cd ..
+	cp ishare/target/release/ibdutils bin/
+	rm -rf ishare
 ```
