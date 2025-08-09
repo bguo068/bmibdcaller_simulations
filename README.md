@@ -165,3 +165,7 @@ popluation-level total IBD per given length ranges
    subfolder named `cmpibd`
 - Run time and memory usage results
    - `time_output.txt` files under subfolders of parent folder named `ibdcalltime`.
+ 
+## Citation
+> Guo Bing, Takala-Harrison Shannon, O’Connor Timothy D (2025). Benchmarking and Optimization of Methods for Detecting
+> Identity-by-Descent in High-Recombining Plasmodium falciparum Genomes. eLife, 14:RP101924. https://doi.org/10.7554/eLife.101924.2
